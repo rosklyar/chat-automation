@@ -2,7 +2,6 @@ import argparse
 import csv
 import os
 from datetime import datetime
-from pathlib import Path
 
 from playwright.sync_api import sync_playwright
 
@@ -31,6 +30,304 @@ def handle_login_modal(page):
     except Exception as e:
         # Modal not present or already dismissed - this is fine
         pass
+
+    return False
+
+
+def handle_welcome_back_modal(page):
+    """
+    Handle the ChatGPT authentication modal by clicking "Continue with Google".
+    This handles both "Welcome back" modal and "Log in or sign up" page that can
+    appear after session load.
+
+    Args:
+        page: Playwright page object
+
+    Returns:
+        True if modal was handled, False if not present
+    """
+    try:
+        print("Checking for authentication modal...")
+
+        # Debug: Print current page info
+        print(f"  Current URL: {page.url}")
+        try:
+            print(f"  Page title: {page.title()}")
+        except:
+            pass
+
+        # Check if we're already at the chat interface (modal already dismissed or not needed)
+        try:
+            textarea = page.locator("#prompt-textarea")
+            if textarea.is_visible(timeout=1000):
+                print("✓ Already at chat interface, no authentication modal needed")
+                return False
+        except:
+            pass  # Not at chat interface yet, continue looking for modal
+
+        # Wait for network to be idle to ensure modal is fully loaded
+        print("  Waiting for page to fully load...")
+        try:
+            page.wait_for_load_state("networkidle", timeout=10000)
+        except:
+            print("  Note: Network not idle, but continuing...")
+
+        # Check for EITHER "Welcome back" OR "Log in or sign up" modals
+        print("  Waiting for authentication modal to appear...")
+        modal_detected = False
+        modal_type = None
+
+        try:
+            # Try "Welcome back" first
+            welcome_heading = page.locator('text="Welcome back"').first
+            welcome_heading.wait_for(state="visible", timeout=5000)
+            print("  ✓ 'Welcome back' modal detected!")
+            modal_detected = True
+            modal_type = "Welcome back"
+        except Exception as e:
+            print(f"  No 'Welcome back' modal found, checking for 'Log in or sign up'...")
+            try:
+                # Try "Log in or sign up"
+                login_heading = page.locator('text="Log in or sign up"').first
+                login_heading.wait_for(state="visible", timeout=5000)
+                print("  ✓ 'Log in or sign up' modal detected!")
+                modal_detected = True
+                modal_type = "Log in or sign up"
+            except Exception as e2:
+                print(f"  No authentication modal appeared: {e2}")
+                return False
+
+        if not modal_detected:
+            print("  No authentication modal detected")
+            return False
+
+        # Give modal animations time to complete
+        page.wait_for_timeout(1500)
+
+        # Check for iframes (modal might be in an iframe)
+        frames = page.frames
+        print(f"  Checking {len(frames)} frames for the modal...")
+
+        # Save HTML for debugging
+        try:
+            html_content = page.content()
+            with open("auth_modal.html", "w", encoding="utf-8") as f:
+                f.write(html_content)
+            print("  HTML saved to auth_modal.html for debugging")
+        except:
+            pass
+
+        # Try multiple selector strategies for "Continue with Google" button
+        continue_button = None
+
+        # Strategy 1: Direct button with exact text "Continue with Google"
+        try:
+            print("  Strategy 1: Looking for button with text 'Continue with Google'...")
+            # Try both exact match and contains
+            selectors_to_try = [
+                'button:has-text("Continue with Google")',
+                'button:text("Continue with Google")',
+                'button:text-is("Continue with Google")',
+                '[role="button"]:has-text("Continue with Google")',
+            ]
+
+            for selector in selectors_to_try:
+                try:
+                    btn = page.locator(selector).first
+                    if btn.count() > 0 and btn.is_visible(timeout=2000):
+                        continue_button = btn
+                        print(f"  ✓ Found button using selector: {selector}")
+                        break
+                except:
+                    continue
+
+        except Exception as e:
+            print(f"  Strategy 1 error: {e}")
+
+        # Strategy 2: Find button containing Google icon + text
+        if not continue_button:
+            try:
+                print("  Strategy 2: Looking for buttons with Google icon...")
+                all_buttons = page.locator("button").all()
+                print(f"  Found {len(all_buttons)} total buttons")
+
+                for idx, btn in enumerate(all_buttons):
+                    try:
+                        if not btn.is_visible():
+                            continue
+
+                        btn_text = btn.inner_text(timeout=500).strip()
+                        btn_html = btn.inner_html(timeout=500)
+
+                        # Look for Google-related content
+                        is_google_button = (
+                            ("Google" in btn_text or "google" in btn_text.lower()) and
+                            ("Continue" in btn_text or "continue" in btn_text.lower())
+                        ) or "google" in btn_html.lower()
+
+                        if is_google_button:
+                            print(f"  ✓ Found Google button (#{idx+1}): '{btn_text[:60]}'")
+                            continue_button = btn
+                            break
+                        else:
+                            # Debug: show all visible buttons
+                            if btn_text:
+                                print(f"    Button #{idx+1}: '{btn_text[:60]}'")
+                    except:
+                        continue
+
+            except Exception as e:
+                print(f"  Strategy 2 error: {e}")
+
+        # Strategy 3: Use get_by_role with name
+        if not continue_button:
+            try:
+                print("  Strategy 3: get_by_role...")
+                continue_button = page.get_by_role("button", name="Continue with Google")
+                if continue_button.count() == 0:
+                    continue_button = None
+                else:
+                    continue_button.wait_for(state="visible", timeout=3000)
+                    print("  ✓ Found button with get_by_role")
+            except Exception as e:
+                print(f"  Strategy 3 failed: {e}")
+                continue_button = None
+
+        # Strategy 4: Look in modal parent container (works for both "Welcome back" and "Log in or sign up")
+        if not continue_button:
+            try:
+                print(f"  Strategy 4: Looking in {modal_type} container...")
+                # Try to find container based on detected modal type
+                if modal_type == "Welcome back":
+                    modal_container = page.locator('text="Welcome back"').locator('..').locator('..')
+                else:  # "Log in or sign up"
+                    modal_container = page.locator('text="Log in or sign up"').locator('..').locator('..')
+
+                google_btn = modal_container.locator('button:has-text("Google")').first
+                if google_btn.count() > 0 and google_btn.is_visible(timeout=2000):
+                    continue_button = google_btn
+                    print(f"  ✓ Found button in {modal_type} container")
+            except Exception as e:
+                print(f"  Strategy 4 failed: {e}")
+
+        # If button found, click it
+        if continue_button:
+            try:
+                print(f"{modal_type} modal detected, attempting to click 'Continue with Google'...")
+
+                # Ensure button is visible and attached
+                continue_button.wait_for(state="visible", timeout=3000)
+                continue_button.wait_for(state="attached", timeout=3000)
+
+                # Get button details for debugging
+                try:
+                    btn_text = continue_button.inner_text(timeout=1000)
+                    print(f"  Button text: '{btn_text}'")
+                    bbox = continue_button.bounding_box()
+                    if bbox:
+                        print(f"  Button position: x={bbox['x']}, y={bbox['y']}, width={bbox['width']}, height={bbox['height']}")
+                except:
+                    pass
+
+                # Scroll into view
+                try:
+                    continue_button.scroll_into_view_if_needed(timeout=3000)
+                    page.wait_for_timeout(500)
+                except:
+                    print("  Note: Could not scroll, but continuing...")
+
+                # Try clicking with different methods
+                click_successful = False
+
+                # Method 1: Normal click
+                try:
+                    print("  Attempt 1: Normal click...")
+                    continue_button.click(timeout=5000)
+                    click_successful = True
+                    print("  ✓ Normal click succeeded")
+                except Exception as e:
+                    print(f"  Normal click failed: {e}")
+
+                # Method 2: Force click (bypass actionability checks)
+                if not click_successful:
+                    try:
+                        print("  Attempt 2: Force click...")
+                        continue_button.click(force=True, timeout=5000)
+                        click_successful = True
+                        print("  ✓ Force click succeeded")
+                    except Exception as e:
+                        print(f"  Force click failed: {e}")
+
+                # Method 3: JavaScript click
+                if not click_successful:
+                    try:
+                        print("  Attempt 3: JavaScript click...")
+                        continue_button.evaluate("el => el.click()")
+                        click_successful = True
+                        print("  ✓ JavaScript click succeeded")
+                    except Exception as e:
+                        print(f"  JavaScript click failed: {e}")
+
+                if not click_successful:
+                    print("  ✗ All click methods failed!")
+                    page.screenshot(path="auth_modal_click_failed.png")
+                    print("  Screenshot saved to auth_modal_click_failed.png")
+                    return False
+
+                print("✓ Clicked 'Continue with Google' button")
+
+                # Wait for authentication flow
+                print("  Waiting for authentication to complete...")
+
+                # Wait for URL change or chat interface
+                for wait_time in [3000, 5000, 5000]:
+                    page.wait_for_timeout(wait_time)
+
+                    # Check if chat interface appeared
+                    try:
+                        textarea = page.locator("#prompt-textarea")
+                        if textarea.is_visible(timeout=2000):
+                            print("✓ Chat interface ready after authentication!")
+                            return True
+                    except:
+                        print(f"  Still waiting... (checked after {wait_time}ms)")
+                        continue
+
+                # Final check with longer timeout
+                print("  Final check for chat interface...")
+                try:
+                    textarea = page.locator("#prompt-textarea")
+                    textarea.wait_for(timeout=10000, state="visible")
+                    print("✓ Chat interface ready after authentication")
+                    return True
+                except:
+                    print("⚠ Warning: Chat interface not ready, but authentication may have succeeded")
+                    return True
+
+            except Exception as e:
+                print(f"✗ Error during click/auth process: {e}")
+                try:
+                    page.screenshot(path="auth_modal_error.png")
+                    print("  Screenshot saved to auth_modal_error.png")
+                except:
+                    pass
+                return False
+        else:
+            print("✗ Could not find 'Continue with Google' button")
+            try:
+                page.screenshot(path="auth_modal_button_not_found.png")
+                print("  Screenshot saved to auth_modal_button_not_found.png")
+            except:
+                pass
+            return False
+
+    except Exception as e:
+        print(f"✗ Error during authentication modal check: {e}")
+        try:
+            page.screenshot(path="auth_modal_exception.png")
+            print("  Screenshot saved to auth_modal_exception.png")
+        except:
+            pass
 
     return False
 
@@ -92,6 +389,9 @@ def is_logged_in(page) -> bool:
         # Navigate to ChatGPT
         page.goto("https://chatgpt.com/", timeout=60000)
         page.wait_for_load_state("domcontentloaded")
+
+        # Handle "Welcome back" modal if it appears
+        handle_welcome_back_modal(page)
 
         # Check for chat interface (indicates logged in)
         textarea = page.locator("#prompt-textarea")
@@ -257,6 +557,9 @@ def chatgpt_automation(prompt: str, prompt_id: str, run_number: int, output_file
     # Handle login modal if it appears (skip if using manual login)
     if not skip_login_modal:
         handle_login_modal(page)
+
+    # Handle "Welcome back" modal if it appears
+    handle_welcome_back_modal(page)
 
     # Wait for and locate the prompt input textarea
     print("Waiting for chat interface...")
@@ -971,6 +1274,9 @@ def start_new_conversation(page, skip_login_modal=False):
         if not skip_login_modal:
             handle_login_modal(page)
 
+        # Handle "Welcome back" modal if it appears
+        handle_welcome_back_modal(page)
+
         # Wait for textarea to be ready
         textarea = page.locator("#prompt-textarea")
         textarea.wait_for(timeout=30000)
@@ -1052,6 +1358,104 @@ def save_to_json(prompt_id: str, prompt_text: str, run_number: int, response_tex
 
 
 
+def load_sessions_from_dir(sessions_dir: str) -> list[str]:
+    """
+    Load all session files from a directory.
+
+    Args:
+        sessions_dir: Path to directory containing session .json files
+
+    Returns:
+        List of absolute paths to session files, sorted alphabetically
+    """
+    import glob
+
+    if not os.path.exists(sessions_dir):
+        print(f"✗ Error: Sessions directory not found: {sessions_dir}")
+        return []
+
+    if not os.path.isdir(sessions_dir):
+        print(f"✗ Error: Path is not a directory: {sessions_dir}")
+        return []
+
+    # Find all .json files in the directory
+    pattern = os.path.join(sessions_dir, "*.json")
+    session_files = glob.glob(pattern)
+
+    if not session_files:
+        print(f"✗ Error: No .json session files found in {sessions_dir}")
+        return []
+
+    # Sort for consistent ordering
+    session_files.sort()
+
+    print(f"✓ Found {len(session_files)} session file(s) in {sessions_dir}:")
+    for idx, session_file in enumerate(session_files, 1):
+        basename = os.path.basename(session_file)
+        print(f"  {idx}. {basename}")
+
+    return session_files
+
+
+def load_and_validate_session(playwright_instance, session_file: str):
+    """
+    Load a session file and validate it by logging in.
+
+    Args:
+        playwright_instance: Active playwright instance (from sync_playwright().start())
+        session_file: Path to session file
+
+    Returns:
+        Tuple of (browser, context, page) if successful, None if failed
+    """
+    print(f"\n{'='*60}")
+    print(f"Loading session: {os.path.basename(session_file)}")
+    print(f"{'='*60}")
+
+    # Launch browser using the provided playwright instance
+    launch_args = [
+        '--disable-blink-features=AutomationControlled',
+        '--disable-dev-shm-usage',
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+    ]
+    browser = playwright_instance.chromium.launch(headless=False, args=launch_args)
+
+    # Load session into context
+    try:
+        context = browser.new_context(
+            storage_state=session_file,
+            viewport={'width': 1280, 'height': 720},
+            user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        )
+        page = context.new_page()
+
+        # Remove webdriver flag
+        page.add_init_script("""
+            Object.defineProperty(navigator, 'webdriver', {
+                get: () => undefined
+            });
+        """)
+
+        # Validate session
+        if is_logged_in(page):
+            print(f"✓ Session loaded and validated: {os.path.basename(session_file)}\n")
+            return (browser, context, page)
+        else:
+            print(f"⚠ Session expired or invalid: {os.path.basename(session_file)}")
+            page.close()
+            browser.close()
+            return None
+
+    except Exception as e:
+        print(f"✗ Failed to load session {os.path.basename(session_file)}: {e}")
+        if 'page' in locals() and page:
+            page.close()
+        if 'browser' in locals() and browser:
+            browser.close()
+        return None
+
+
 def parse_args():
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
@@ -1081,21 +1485,50 @@ def parse_args():
     parser.add_argument(
         "-s", "--session-file",
         default="chatgpt_session.json",
-        help="Path to session file for persisting login state (default: chatgpt_session.json)"
+        help="Path to single session file (legacy, use --sessions-dir for multiple sessions)"
+    )
+    parser.add_argument(
+        "--sessions-dir",
+        help="Path to directory containing multiple session files (for session rotation)"
+    )
+    parser.add_argument(
+        "--per-session-runs",
+        type=int,
+        default=10,
+        help="Number of runs to perform with each session before switching (default: 10, only used with --sessions-dir)"
     )
     return parser.parse_args()
 
 
+# New main() function with session rotation support
+# This will replace the existing main() function in main.py
+
 def main():
-    """Main function to orchestrate CSV processing and multiple runs."""
+    """Main function to orchestrate CSV processing and multiple runs with session rotation."""
     args = parse_args()
 
     print(f"=== ChatGPT Automation ===")
     print(f"Input file: {args.input}")
     print(f"Runs per prompt: {args.runs}")
     print(f"Output file: {args.output}")
-    print(f"Session file: {args.session_file}")
-    print()
+
+    # Determine if using single session or multiple sessions
+    if args.sessions_dir:
+        print(f"Sessions directory: {args.sessions_dir}")
+        print(f"Per-session runs: {args.per_session_runs}")
+        print()
+
+        # Load all sessions from directory
+        session_files = load_sessions_from_dir(args.sessions_dir)
+        if not session_files:
+            print("✗ No session files found. Exiting.")
+            return
+
+        print()
+    else:
+        print(f"Session file: {args.session_file}")
+        print()
+        session_files = [args.session_file]  # Single session mode
 
     # Read prompts from CSV
     prompts = read_prompts_from_csv(args.input)
@@ -1110,32 +1543,35 @@ def main():
     print(f"Total runs: {total_runs}")
     print()
 
-    # Process each prompt
+    # Session rotation setup
+    using_rotation = args.sessions_dir is not None
+    current_session_idx = 0
+    runs_on_current_session = 0
     browser_context = None
     page = None
     completed_runs = 0
-    session_loaded = False
 
-    # Try to load existing session
-    print("Checking for existing session...")
-    if os.path.exists(args.session_file):
-        print(f"✓ Found session file: {args.session_file}")
-        print("Attempting to load saved session...")
+    # Start playwright once for the entire session (reused for all browser instances)
+    print("Initializing Playwright...")
+    playwright = sync_playwright().start()
+    print("✓ Playwright initialized\n")
 
-        # Launch browser with saved session
-        p = sync_playwright().start()
-        launch_args = [
-            '--disable-blink-features=AutomationControlled',
-            '--disable-dev-shm-usage',
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-        ]
-        browser = p.chromium.launch(headless=False, args=launch_args)
+    # Handle manual login mode (only for single session, not rotation)
+    if not using_rotation and args.wait_for_login:
+        # Legacy manual login mode (single session only)
+        if not os.path.exists(session_files[0]):
+            print("\nManual login mode enabled")
+            print("Opening browser for login...")
 
-        # Load session into context
-        try:
+            # Launch browser using the playwright instance
+            launch_args = [
+                '--disable-blink-features=AutomationControlled',
+                '--disable-dev-shm-usage',
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+            ]
+            browser = playwright.chromium.launch(headless=False, args=launch_args)
             context = browser.new_context(
-                storage_state=args.session_file,
                 viewport={'width': 1280, 'height': 720},
                 user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
             )
@@ -1148,79 +1584,24 @@ def main():
                 });
             """)
 
-            # Validate session
-            if is_logged_in(page):
-                browser_context = (browser, context)
-                session_loaded = True
-                print("✓ Session loaded and validated successfully!\n")
-            else:
-                print("⚠ Session expired or invalid, will need to login again")
-                page.close()
+            # Navigate and wait for login
+            page.goto("https://chatgpt.com/", timeout=60000)
+            page.wait_for_load_state("domcontentloaded")
+
+            # Wait for manual login
+            if not wait_for_manual_login(page):
+                print("✗ Manual login failed or was cancelled")
                 browser.close()
-                page = None
-                browser_context = None
-        except Exception as e:
-            print(f"✗ Failed to load session: {e}")
-            if page:
-                page.close()
-            if browser:
-                browser.close()
-            page = None
-            browser_context = None
-    else:
-        print(f"⚠ No session file found at {args.session_file}")
+                return
 
-    # Handle manual login if session not loaded and login requested
-    if not session_loaded and args.wait_for_login:
-        print("\nManual login mode enabled")
-        print("Opening browser for login...")
+            # Store browser context
+            browser_context = (browser, context)
 
-        # Launch browser
-        p = sync_playwright().start()
-        launch_args = [
-            '--disable-blink-features=AutomationControlled',
-            '--disable-dev-shm-usage',
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-        ]
-        browser = p.chromium.launch(headless=False, args=launch_args)
-        context = browser.new_context(
-            viewport={'width': 1280, 'height': 720},
-            user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        )
-        page = context.new_page()
+            # Save session for future use
+            print(f"\nSaving session to {session_files[0]}...")
+            save_session(context, session_files[0])
 
-        # Remove webdriver flag
-        page.add_init_script("""
-            Object.defineProperty(navigator, 'webdriver', {
-                get: () => undefined
-            });
-        """)
-
-        # Navigate and wait for login
-        page.goto("https://chatgpt.com/", timeout=60000)
-        page.wait_for_load_state("domcontentloaded")
-
-        # Wait for manual login
-        if not wait_for_manual_login(page):
-            print("✗ Manual login failed or was cancelled")
-            browser.close()
-            return
-
-        # Store browser context
-        browser_context = (browser, context)
-
-        # Save session for future use
-        print(f"\nSaving session to {args.session_file}...")
-        save_session(context, args.session_file)
-
-        print("✓ Manual login successful, continuing with automation...\n")
-    elif not session_loaded and not args.wait_for_login:
-        print("\n⚠ No valid session found and --wait-for-login not specified")
-        print("   Either:")
-        print("   1. Use --wait-for-login flag to perform manual login, or")
-        print("   2. Provide a valid session file with -s/--session-file")
-        return
+            print("✓ Manual login successful, continuing with automation...\n")
 
     try:
         for prompt_idx, prompt_data in enumerate(prompts, 1):
@@ -1237,15 +1618,82 @@ def main():
                 completed_runs += 1
                 print(f"\n--- Run {run}/{args.runs} (Overall: {completed_runs}/{total_runs}) ---")
 
+                # SESSION ROTATION LOGIC
+                if using_rotation:
+                    # Check if we need to switch sessions
+                    if runs_on_current_session >= args.per_session_runs or browser_context is None:
+                        # Close current browser if exists
+                        if browser_context:
+                            try:
+                                print(f"\nReached {runs_on_current_session} runs on current session, switching...")
+                                browser, context = browser_context
+                                browser.close()
+                                print("✓ Closed previous browser")
+                            except Exception as e:
+                                print(f"Warning: Error closing browser: {e}")
+                            browser_context = None
+                            page = None
+
+                        # Switch to next session (cycle through sessions)
+                        current_session_idx = (current_session_idx + 1) % len(session_files)
+                        current_session_file = session_files[current_session_idx]
+                        runs_on_current_session = 0
+
+                        print(f"Loading session {current_session_idx + 1}/{len(session_files)}: {os.path.basename(current_session_file)}")
+
+                        # Load and validate new session
+                        result = load_and_validate_session(playwright, current_session_file)
+                        if result:
+                            browser, context, page = result
+                            browser_context = (browser, context)
+                            print(f"✓ Ready to use session: {os.path.basename(current_session_file)}\n")
+                        else:
+                            print(f"✗ Failed to load session: {os.path.basename(current_session_file)}")
+                            print("⚠ Skipping this run...")
+                            continue
+
+                    runs_on_current_session += 1
+                    print(f"[Session {current_session_idx + 1}/{len(session_files)}: {os.path.basename(session_files[current_session_idx])}, Run {runs_on_current_session}/{args.per_session_runs}]")
+
+                else:
+                    # Single session mode - load session on first run if not already loaded
+                    if browser_context is None:
+                        session_file = session_files[0]
+
+                        if os.path.exists(session_file):
+                            print(f"Loading session: {os.path.basename(session_file)}...")
+                            result = load_and_validate_session(playwright, session_file)
+                            if result:
+                                browser, context, page = result
+                                browser_context = (browser, context)
+                            else:
+                                print("✗ Session validation failed")
+                                if not args.wait_for_login:
+                                    print("\n⚠ No valid session found and --wait-for-login not specified")
+                                    print("   Either:")
+                                    print("   1. Use --wait-for-login flag to perform manual login, or")
+                                    print("   2. Provide a valid session file with -s/--session-file")
+                                    return
+                        elif not args.wait_for_login:
+                            print(f"⚠ No session file found at {session_file}")
+                            print("   Either:")
+                            print("   1. Use --wait-for-login flag to perform manual login, or")
+                            print("   2. Provide a valid session file with -s/--session-file")
+                            return
+
                 # For runs after the first, start a new conversation
                 if browser_context and page and run > 1:
                     if not start_new_conversation(page, skip_login_modal=args.wait_for_login):
-                        print("⚠ Failed to start new conversation, creating fresh browser...")
+                        print("⚠ Failed to start new conversation, will retry with fresh browser...")
                         if browser_context:
                             browser, context = browser_context
                             browser.close()
                         browser_context = None
                         page = None
+                        # Will reload session on next iteration
+                        if using_rotation:
+                            runs_on_current_session = args.per_session_runs  # Force session switch
+                        continue
 
                 # Execute automation
                 try:
@@ -1266,6 +1714,8 @@ def main():
                         print("⚠ Run failed, resetting browser...")
                         browser_context = None
                         page = None
+                        if using_rotation:
+                            runs_on_current_session = args.per_session_runs  # Force session switch
 
                 except Exception as e:
                     print(f"✗ Error during run: {e}")
@@ -1278,6 +1728,8 @@ def main():
                             pass
                     browser_context = None
                     page = None
+                    if using_rotation:
+                        runs_on_current_session = args.per_session_runs  # Force session switch
 
     finally:
         # Clean up browser
@@ -1289,11 +1741,17 @@ def main():
             except Exception as e:
                 print(f"Warning: Error closing browser: {e}")
 
+        # Stop playwright
+        try:
+            playwright.stop()
+            print("✓ Playwright stopped")
+        except Exception as e:
+            print(f"Warning: Error stopping Playwright: {e}")
+
     print(f"\n{'='*60}")
     print(f"✓ Completed {completed_runs}/{total_runs} runs")
     print(f"✓ Results saved to {args.output}")
     print("Done!")
-
 
 if __name__ == "__main__":
     main()
