@@ -1499,10 +1499,6 @@ def parse_args():
     )
     return parser.parse_args()
 
-
-# New main() function with session rotation support
-# This will replace the existing main() function in main.py
-
 def main():
     """Main function to orchestrate CSV processing and multiple runs with session rotation."""
     args = parse_args()

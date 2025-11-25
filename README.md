@@ -1,111 +1,92 @@
-# ChatGPT Automation Scraper
+# AI-assistants answers platform
 
-A fully automated scraper for ChatGPT answers with cited sources. This tool automates browser interactions with the ChatGPT web application to send prompts and extract responses including citations.
+## Why
 
-## What This Project Does
+This platform provides a scalable service for retrieving answers from multiple AI assistants (ChatGPT, Claude, Google AI Overview, Perplexity).
 
-**ChatGPT Automation** is a production-ready scraper that:
 
-- ✅ **Fully automated**: Send prompts to ChatGPT and scrape answers automatically
-- ✅ **Citations extraction**: Extracts cited sources from ChatGPT responses
-- ✅ **Multiple runs**: Run the same prompt multiple times for result consistency
-- ✅ **Session rotation**: Distribute load across multiple Google accounts to avoid rate limits
-- ✅ **Docker-ready**: Containerized deployment with virtual display
+- Users submit prompts to the system
+- System instantly returns cached answers if available (using vector similarity search for prompts embeddings with threshold > 0.95)
+- New prompts(no similarity >= 0.95 in db) are automatically scheduled for execution across AI assistants. Answers is going to be served as soon as they ready with callback
+- Answers are stored and become available for future requests
 
-### Technology Stack
+## Overall Architecture
 
-- **Playwright**: Browser automation framework for controlling Chromium
-- **Docker + Xvfb**: Virtual display (`:99`) for running headful browsers in containers
-- **Python 3.11**: Core programming language
-- **uv**: Fast Python package manager
+![Architecture Diagram](ai-assistants-answers-arch.png)
 
-### How It Works
+### Main Flows
 
-```
-Input (CSV)          Processing                    Output (JSON)
-┌──────────┐        ┌─────────────┐               ┌──────────────┐
-│ Prompts  │───────>│  Playwright │──────────────>│  Answers +   │
-│  .csv    │        │  + ChatGPT  │               │  Citations   │
-└──────────┘        └─────────────┘               └──────────────┘
-                         │
-                    Xvfb Display :99
-                    (Virtual Screen)
-```
+1. **Session Creation Flow**
+   - Backoffice operator creates logins to AI-assistant with created credentials → `session-creation-frontend` → `chat-session-provider` → PostgreSQL (`sessions-db`)
+   - Creates and stores authenticated session files for automation bots
 
-**Input**: CSV file with prompts to send to ChatGPT
-**Processing**: Playwright automates browser, sends prompts, waits for responses, extracts citations
-**Output**: JSON file with answers and cited sources for each prompt run
+2. **Answer Request Flow**
+   - Customer → `answers-provider` → PostgreSQL + pgvector (`prompts-db` + `llm-answers-db`)
+   - Searches for similar prompts (similarity > 0.95) and returns cached answers instantly
+   - Returns existing answers and notifies that prompt is scheduled if no similar prompt found
 
-### Why Xvfb (Virtual Display :99)?
+3. **Automation Flow**
+   - `prompts-scheduler` → Kafka (`prompts-tasks`) → `automation-bot` instances (scalable)
+   - prompts-scheduler reads prompts which were requested by any client and creates tasks as kafka messages which contains all needed info for automation-bot to evaluate answers
+   - Bots get sessions from `chat-session-provider` according to specific info in prompts-tasks(for example target account preferences)
+   - Bots execute prompts and produce results to Kafka (`llm-answers`)
+   - `kafka-connector-for-postgres` writes answers to PostgreSQL (`llm-answers-db`) with prompt_id foreign key
 
-ChatGPT uses Cloudflare bot detection which blocks headless browsers. This scraper runs browsers in **headful mode** (with a visible window) to bypass detection. In Docker containers (which have no physical display), we use **Xvfb (X Virtual Framebuffer)** to create a fake display at `:99`, allowing headful browsers to run without a physical screen.
+### Technologies
 
-## Building the Docker Image
+- **Frontend**: Session creation UI: React
+- **Backend Services**: Python-based microservices (chat-session-provider, answers-provider, prompts-scheduler)
+- **Databases**: PostgreSQL (sessions as json), PostgreSQL + pgvector (vector similarity search for prompts)
+- **Message Queue**: Apache Kafka (prompts-tasks, llm-answers topics)
+- **Automation**: Playwright-based bots running in Docker containers
+- **Data Integration**: Kafka Connect for PostgreSQL
 
-### Prerequisites
+### Microservices
 
-- Docker installed and running
-- Session files from Google accounts (see Session Setup below)
+| Service | Purpose |
+|---------|---------|
+| `session-creation-frontend` | UI for creating authenticated sessions |
+| `chat-session-provider` | Manages and provides bot session files |
+| `answers-provider` | Searches cached answers using vector similarity |
+| `prompts-scheduler` | Schedules prompt execution tasks to Kafka |
+| `automation-bot` | Scalable workers that execute prompts on AI assistants |
+| `kafka-connector-for-postgres` | Syncs Kafka messages to PostgreSQL |
 
-### Build Command
+## ChatGPT Bot (Current Implementation)
+
+The ChatGPT automation bot is fully implemented and uses:
+- **Playwright** for browser automation
+- **Docker + Xvfb** for headful browser execution (bypasses Cloudflare detection)
+- **Session rotation** to distribute load across multiple Google accounts
+
+### Build Docker Image
 
 ```bash
 docker build -t chatgpt-automation .
 ```
 
-**What gets built:**
-- Python 3.11 slim base image
-- Xvfb for virtual display (`:99`)
-- Playwright browser automation library
-- Chromium browser with all dependencies
-- Application scripts (`main.py`, `create_session.py`)
+### Run with Docker
 
-**Build time**: ~2-3 minutes (downloads Chromium browser)
-
-### Verify Build
+**Prerequisites:** Create session files locally first:
 
 ```bash
-docker images | grep chatgpt-automation
-```
-
-You should see the image listed with tag `latest`.
-
-## Running with Docker
-
-### Session Setup (One-Time)
-
-Before running with Docker, you need to create session files locally. Session files store authenticated login state (cookies) for ChatGPT.
-
-**Create sessions for multiple Google accounts** (recommended for rate limit avoidance):
-
-```bash
-# Install dependencies locally
 uv sync
 uv run playwright install chromium
-
-# Create session directory
 mkdir sessions
 
-# Create session files (manual login required for each)
+# Create sessions for multiple accounts
 uv run create_session.py --output sessions/account1.json
 uv run create_session.py --output sessions/account2.json
 uv run create_session.py --output sessions/account3.json
-uv run create_session.py --output sessions/account4.json
 ```
 
-Each command opens a browser window. Log in manually with a different Google account, then press Enter in the terminal. The session is saved to the specified `.json` file.
-
-### Example: Run test_prompts.csv with Session Rotation
-
-This example demonstrates running `test_prompts.csv` (5 prompts) with:
-- **10 runs per prompt** = 50 total runs
-- **Session change every 5 runs** (distributes load across 4 Google accounts)
+**Run with session rotation:**
 
 ```bash
 docker run --rm \
   --shm-size=2gb \
   --security-opt seccomp:unconfined \
-  -v $(pwd)/test_prompts.csv:/app/prompts.csv:ro \
+  -v $(pwd)/prompts.csv:/app/prompts.csv:ro \
   -v $(pwd)/sessions:/app/sessions:ro \
   -v $(pwd)/results:/app/results \
   chatgpt-automation \
@@ -113,201 +94,71 @@ docker run --rm \
   --sessions-dir /app/sessions \
   --runs 10 \
   --per-session-runs 5 \
-  --output /app/results/test_results.json
+  --output /app/results/output.json
 ```
 
-**What this does:**
-- Runs each of 5 prompts 10 times (50 total runs)
-- Uses 4 sessions from `./sessions` directory
-- Rotates sessions every 5 runs:
-  - Runs 1-5: session 1 (account1.json)
-  - Runs 6-10: session 2 (account2.json)
-  - Runs 11-15: session 3 (account3.json)
-  - Runs 16-20: session 4 (account4.json)
-  - Runs 21-25: session 1 (cycles back)
-  - ... and so on
-- Saves results to `./results/test_results.json`
-
-### Docker Arguments Explained
-
-| Argument | Purpose |
-|----------|---------|
-| `--rm` | Remove container after run (cleanup) |
-| `--shm-size=2gb` | Increase shared memory for Chromium (prevents crashes) |
-| `--security-opt seccomp:unconfined` | Allow Chrome sandbox to work properly |
-| `-v $(pwd)/test_prompts.csv:/app/prompts.csv:ro` | Mount input CSV (read-only) |
-| `-v $(pwd)/sessions:/app/sessions:ro` | Mount sessions directory (read-only) |
-| `-v $(pwd)/results:/app/results` | Mount results directory (read-write) |
-
-### Application Arguments Explained
-
-| Argument | Purpose | Example |
-|----------|---------|---------|
-| `--input` | Path to input CSV file | `/app/prompts.csv` |
-| `--sessions-dir` | Directory with session files for rotation | `/app/sessions` |
-| `--runs` | Number of times to run each prompt | `10` |
-| `--per-session-runs` | Runs per session before switching | `5` |
-| `--output` | Path to output JSON file | `/app/results/output.json` |
-
-**Alternative: Single Session Mode** (no rotation):
-
-```bash
-docker run --rm \
-  --shm-size=2gb \
-  --security-opt seccomp:unconfined \
-  -v $(pwd)/test_prompts.csv:/app/prompts.csv:ro \
-  -v $(pwd)/sessions/account1.json:/app/session.json:ro \
-  -v $(pwd)/results:/app/results \
-  chatgpt-automation \
-  --input /app/prompts.csv \
-  --session-file /app/session.json \
-  --runs 10 \
-  --output /app/results/test_results.json
-```
-
-## Input Format
-
-CSV file with columns: `id`, `prompt`
-
+**Input Format** (CSV):
 ```csv
 id,prompt
-1,"Find me the best laptops under $1,000 with long battery life and at least 16GB of RAM"
-2,"Compare the newest noise-canceling headphones and tell me which ones are best for commuting"
-3,"I'm looking for a budget-friendly smartphone with a great camera—what should I buy?"
+1,"Find me the best laptops under $1,000"
+2,"Compare noise-canceling headphones for commuting"
 ```
 
-## Output Format
-
-JSON file with nested structure:
-
+**Output Format** (JSON):
 ```json
 [
   {
     "prompt_id": "1",
-    "prompt": "Find me the best laptops under $1,000 with long battery life and at least 16GB of RAM",
+    "prompt": "Find me the best laptops under $1,000",
     "answers": [
       {
         "run_number": 1,
-        "response": "Here are some excellent laptops under $1,000 with long battery life...",
+        "response": "Here are excellent laptops...",
         "citations": [
-          {
-            "url": "https://www.techradar.com/best-laptops",
-            "text": "TechRadar - Best Laptops 2024"
-          },
-          {
-            "url": "https://www.laptopmag.com/reviews",
-            "text": "Laptop Mag - Reviews and Buying Guides"
-          }
+          {"url": "https://example.com", "text": "Source"}
         ],
         "timestamp": "2024-01-20T10:30:00.123456"
-      },
-      {
-        "run_number": 2,
-        "response": "Based on current market analysis, these laptops stand out...",
-        "citations": [
-          {
-            "url": "https://www.consumerreports.org/laptops",
-            "text": "Consumer Reports - Laptop Ratings"
-          }
-        ],
-        "timestamp": "2024-01-20T10:35:00.789012"
       }
     ]
   }
 ]
 ```
 
-## Local Development (Without Docker)
+**Video tutorial coming soon** demonstrating Docker execution and JSON output capture.
 
-### Installation
+## Quick Reference
+
+### Local Development
 
 ```bash
 # Install dependencies
 uv sync
-
-# Install Playwright browsers
 uv run playwright install chromium
-```
 
-### Usage
-
-```bash
-# Create a session file
+# Create session
 uv run create_session.py --output session.json
 
-# Run with single session
+# Run automation
 uv run main.py --session-file session.json --input prompts.csv --runs 3
-
-# Run with session rotation
-uv run main.py --sessions-dir ./sessions --input prompts.csv --runs 10 --per-session-runs 5
 ```
 
-## Troubleshooting
+### Docker Arguments
 
-### Session Expired
+| Argument | Purpose |
+|----------|---------|
+| `--shm-size=2gb` | Increase shared memory for Chromium |
+| `--security-opt seccomp:unconfined` | Allow Chrome sandbox |
+| `-v $(pwd)/prompts.csv:/app/prompts.csv:ro` | Mount input CSV (read-only) |
+| `-v $(pwd)/sessions:/app/sessions:ro` | Mount sessions directory (read-only) |
+| `-v $(pwd)/results:/app/results` | Mount results directory (read-write) |
 
-If you see "Session validation failed":
-- Sessions expire after inactivity
-- Re-run `create_session.py` to create fresh sessions
-- You may need to log in again manually
+### Application Arguments
 
-### Cloudflare Detection
-
-If ChatGPT detects automation:
-- Ensure you're using valid session files
-- Reduce `--per-session-runs` to switch sessions more frequently
-- Add more session files to distribute load
-- The Docker + Xvfb setup helps avoid detection
-
-### Browser Crashes in Docker
-
-If Chromium crashes:
-- Increase `--shm-size` to `4gb` or higher
-- Ensure Docker has sufficient memory allocated (Settings → Resources)
-- Check Docker logs: `docker logs <container-id>`
-
-### No Citations Extracted
-
-Citations only appear when:
-- You're logged in (session file is valid)
-- ChatGPT decides to cite sources (not guaranteed for every prompt)
-- The response includes sources (depends on prompt type)
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                    Docker Container                      │
-│                                                          │
-│  ┌──────────┐         ┌────────────┐                    │
-│  │  Xvfb    │────────>│ Chromium   │                    │
-│  │ Display  │         │ (Headful)  │                    │
-│  │   :99    │         └────────────┘                    │
-│  └──────────┘               │                           │
-│                              │                           │
-│                        ┌─────▼──────┐                   │
-│                        │ Playwright │                   │
-│                        │ Automation │                   │
-│                        └─────┬──────┘                   │
-│                              │                           │
-│                        ┌─────▼──────┐                   │
-│                        │  main.py   │                   │
-│                        │  (Python)  │                   │
-│                        └────────────┘                   │
-│                                                          │
-└─────────────────────────────────────────────────────────┘
-                          │           │
-                    Input CSV    Output JSON
-                     (Prompts)   (Answers + Citations)
-```
-
-**Components:**
-- **Xvfb**: Virtual X11 display server (fake screen at `:99`)
-- **Chromium**: Full web browser (headful mode to bypass Cloudflare)
-- **Playwright**: Browser automation library (controls Chromium)
-- **main.py**: Python script orchestrating the automation
-- **Session files**: Stored authentication state (cookies, localStorage)
-
-## License
-
-MIT
+| Argument | Purpose | Example |
+|----------|---------|---------|
+| `--input` | Input CSV file | `/app/prompts.csv` |
+| `--sessions-dir` | Session rotation directory | `/app/sessions` |
+| `--session-file` | Single session file | `/app/session.json` |
+| `--runs` | Runs per prompt | `10` |
+| `--per-session-runs` | Runs before session switch | `5` |
+| `--output` | Output JSON file | `/app/results/output.json` |
