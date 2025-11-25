@@ -15,7 +15,7 @@ export DISPLAY=:99
 echo "Running ChatGPT automation..."
 
 # Run the Python script directly, passing all arguments
-python main.py "$@"
+python src/bot.py "$@"
 
 # Capture exit code
 EXIT_CODE=$?

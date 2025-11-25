@@ -75,9 +75,9 @@ uv run playwright install chromium
 mkdir sessions
 
 # Create sessions for multiple accounts
-uv run create_session.py --output sessions/account1.json
-uv run create_session.py --output sessions/account2.json
-uv run create_session.py --output sessions/account3.json
+uv run src/create_session.py --output sessions/account1.json
+uv run src/create_session.py --output sessions/account2.json
+uv run src/create_session.py --output sessions/account3.json
 ```
 
 **Run with session rotation:**
@@ -124,7 +124,15 @@ id,prompt
 ]
 ```
 
-**Video tutorial coming soon** demonstrating Docker execution and JSON output capture.
+### Video Tutorials
+
+**1. How it utilizes Chromium and Playwright to automate ChatGPT interactions**
+
+<video src="https://github.com/rosklyar/chat-automation/raw/main/videos/gpt-automation.mp4" controls width="100%"></video>
+
+**2. How it runs as a Docker image and can be scaled**
+
+<video src="https://github.com/rosklyar/chat-automation/raw/main/videos/gpt-automation-dockerized.mp4" controls width="100%"></video>
 
 ## Quick Reference
 
@@ -135,11 +143,15 @@ id,prompt
 uv sync
 uv run playwright install chromium
 
-# Create session
-uv run create_session.py --output session.json
+# Create sessions (one or more)
+mkdir sessions
+uv run src/create_session.py --output sessions/account1.json
 
 # Run automation
-uv run main.py --session-file session.json --input prompts.csv --runs 3
+uv run src/bot.py --sessions-dir sessions --input prompts.csv --runs 3
+
+# Run tests
+uv run pytest
 ```
 
 ### Docker Arguments
@@ -154,11 +166,10 @@ uv run main.py --session-file session.json --input prompts.csv --runs 3
 
 ### Application Arguments
 
-| Argument | Purpose | Example |
-|----------|---------|---------|
-| `--input` | Input CSV file | `/app/prompts.csv` |
-| `--sessions-dir` | Session rotation directory | `/app/sessions` |
-| `--session-file` | Single session file | `/app/session.json` |
-| `--runs` | Runs per prompt | `10` |
-| `--per-session-runs` | Runs before session switch | `5` |
-| `--output` | Output JSON file | `/app/results/output.json` |
+| Argument | Purpose | Example | Required |
+|----------|---------|---------|----------|
+| `--input` | Input CSV file | `/app/prompts.csv` | No (default: `prompts.csv`) |
+| `--sessions-dir` | Directory with session files | `/app/sessions` | **Yes** |
+| `--runs` | Runs per prompt | `10` | No (default: `1`) |
+| `--per-session-runs` | Runs before session switch | `5` | No (default: `10`) |
+| `--output` | Output JSON file | `/app/results/output.json` | No (default: `chatgpt_results.json`) |

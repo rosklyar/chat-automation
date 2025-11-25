@@ -15,11 +15,15 @@ This project automates interactions with the ChatGPT web application using Playw
 ## Common Commands
 
 ```bash
-# Create a session file (manual login)
-uv run create_session.py --output session.json
+# Create session files (manual login)
+mkdir sessions
+uv run src/create_session.py --output sessions/account1.json
 
-# Run the main application with a saved session
-uv run main.py --session-file session.json --input prompts.csv --runs 3
+# Run the main application with saved sessions
+uv run src/bot.py --sessions-dir sessions --input prompts.csv --runs 3
+
+# Run tests
+uv run pytest
 
 # Add a new dependency
 uv add <package-name>
@@ -35,8 +39,8 @@ uv sync
 
 The project includes two main scripts:
 
-1. **create_session.py** - Create authenticated session files
-2. **main.py** - Run automation with saved sessions
+1. **src/create_session.py** - Create authenticated session files
+2. **src/bot.py** - Run automation with saved sessions
 
 ### Creating Sessions
 
@@ -44,40 +48,35 @@ Create session files for different Google accounts to avoid rate limits:
 
 ```bash
 # Create sessions for multiple accounts
-uv run create_session.py --output session_account1.json
-uv run create_session.py --output session_account2.json
-uv run create_session.py --output session_account3.json
+uv run src/create_session.py --output session_account1.json
+uv run src/create_session.py --output session_account2.json
+uv run src/create_session.py --output session_account3.json
 
 # Or organize them in a directory
 mkdir sessions
-uv run create_session.py --output sessions/account1.json
-uv run create_session.py --output sessions/account2.json
-uv run create_session.py --output sessions/account3.json
-uv run create_session.py --output sessions/account4.json
+uv run src/create_session.py --output sessions/account1.json
+uv run src/create_session.py --output sessions/account2.json
+uv run src/create_session.py --output sessions/account3.json
+uv run src/create_session.py --output sessions/account4.json
 ```
 
 Each session file stores the authenticated state (cookies, storage) for reuse.
 
 ### Using Sessions
 
-#### Single Session Mode
+The bot always uses session rotation mode - simply provide a directory with one or more session files.
 
-Use a single session file (legacy mode):
+**For single session:** Put one file in the directory
+**For rotation:** Put multiple files in the directory
 
-```bash
-uv run main.py --session-file session_account1.json --input prompts.csv --runs 3
-```
-
-#### Session Rotation Mode (Recommended)
-
-Automatically rotate through multiple sessions to distribute load and avoid rate limits:
+Automatically rotates through sessions to distribute load and avoid rate limits:
 
 ```bash
 # Run 10 prompts with 5 runs each = 50 total runs
 # 4 sessions in ./sessions directory
 # --per-session-runs 10 means each session handles 10 runs before switching
 
-uv run main.py --sessions-dir ./sessions --input prompts.csv --runs 5 --per-session-runs 10
+uv run src/bot.py --sessions-dir ./sessions --input prompts.csv --runs 5 --per-session-runs 10
 ```
 
 **How it works:**
@@ -97,7 +96,7 @@ uv run main.py --sessions-dir ./sessions --input prompts.csv --runs 5 --per-sess
 - ✅ **Automatic rotation** - Script handles session switching automatically
 - ✅ **Cycle indefinitely** - Sessions are reused in round-robin fashion
 - ✅ **No manual intervention** - Set it and forget it
-- ✅ **Backward compatible** - Single session mode still works with `--session-file`
+- ✅ **Unified approach** - Single or multiple sessions use the same `--sessions-dir` parameter
 
 ## Architecture
 
