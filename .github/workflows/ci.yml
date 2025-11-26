@@ -1,0 +1,74 @@
+name: CI/CD
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    # Add permissions for Docker access
+    permissions:
+      contents: read
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Start Docker daemon
+      run: |
+        sudo systemctl start docker
+        sudo docker info
+
+    - name: Install uv
+      run: pip install uv
+
+    - name: Cache uv dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/uv
+        key: ${{ runner.os }}-uv-${{ hashFiles('**/uv.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-uv-
+
+    - name: Install dependencies
+      run: uv sync
+
+    - name: Pull PostgreSQL Docker image with pgvector
+      run: docker pull pgvector/pgvector:pg15
+
+    - name: Run tests with testcontainers
+      run: uv run pytest -v
+      env:
+        # Set Docker host for testcontainers
+        DOCKER_HOST: unix:///var/run/docker.sock
+        # Enable testcontainers logging for debugging
+        TESTCONTAINERS_LOG_LEVEL: DEBUG
+
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+      with:
+        version: "latest"
+
+    - name: Set up Python
+      run: uv python install 3.11
+
+    - name: Check Python syntax
+      run: |
+        uv run python -m py_compile src/bot.py
+        uv run python -m py_compile src/create_session.py
+        uv run python -m py_compile tests/test_session.py

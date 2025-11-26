@@ -1,9 +1,35 @@
 [project]
 name = "chat-automation"
 version = "0.1.0"
-description = "Add your description here"
+description = "ChatGPT automation platform with browser automation and session management"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "playwright>=1.55.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.1.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+addopts = "-v --strict-markers"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.1",
+    "pytest-cov>=7.0.0",
 ]

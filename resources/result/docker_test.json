@@ -1,0 +1,604 @@
+[
+  {
+    "prompt_id": "1",
+    "prompt": "Find me the best laptops under $1,000 with long battery life and at least 16GB of RAM",
+    "answers": [
+      {
+        "run_number": 1,
+        "response": "Nice — I’ll shortlist laptops you can realistically get under $1,000 (or at/near $999) that meet your must-haves: ≥16 GB RAM and long battery life. I checked recent reviews/tests and picked options across macOS and Windows so you can pick what you prefer.\n\nShortlist (what I recommend first)\n1) Apple MacBook Air (M4, 2025) — Best all-round (battery + performance) if you’re OK with macOS\n\nWhy: M4 is very power-efficient so real-world battery life is excellent (many reviewers report >16 hrs light use / ~10+ hrs heavy use). The 2025 entry configurations are available at ≈ $999 with 16 GB in some markets. \nThe Guardian\n\n2) ASUS Zenbook A14 (2025, Snapdragon / ARM variants) — Best ultra-light Windows option with outstanding battery\n\nWhy: ultraportable (sub-1kg options) and very long battery life thanks to Snapdragon/ARM designs; there are 16GB configurations at or near $999. Good if you want max mobility and multi-day battery for light tasks. \nWindows Central\n+1\n\n3) Lenovo IdeaPad Slim 3x (Snapdragon-based, 16GB) — Best for longest battery life on a budget\n\nWhy: recent tests show ~16+ hours in light use and it's priced well (example review shows $749 configuration with 16GB). Great value if battery tops your checklist and you accept Arm app-compat tradeoffs. \nTom's Guide\n\n4) Acer Swift Go / Swift 3 (2024–2025 Intel/AMD models) — Best Windows value: solid battery + 16GB options under $1k\n\nWhy: newer Swift Go / Swift 3 revisions promise all-day battery (real-world tests often 10–12+ hours depending on config) and 16GB configurations are commonly available under $1,000. Good balance of performance, battery, and price. \nDigital Nomad World\n+2\nVARGE\n+2\n\nQuick picks by use-case\n\nIf you want macOS (best battery + performance): MacBook Air M4. \nThe Guardian\n\nIf you want Windows but longest battery (ARM): Lenovo IdeaPad Slim 3x (Snapdragon) or ASUS Zenbook A14 (ARM). \nTom's Guide\n+1\n\nIf you want a mainstream Intel/AMD Windows laptop with balanced battery & price: Acer Swift 3 / Swift Go or Lenovo IdeaPad Slim 5i (check battery spec / 60–80Wh options). \nDigital Nomad World\n+1\n\nNotes, caveats & buying tips\n\nBattery tests vary a lot. Manufacturer claims are optimistic; look for real-world test numbers in reviews (I used several). If you need all-day guaranteed battery, prefer models with Snapdragon/Apple Silicon or large battery capacities (60–75 Wh) in independent tests. \nLaptopMedia\n+1\n\nPrice and configuration matter. Retailers frequently put higher-RAM configs on sale; base models often start at 8GB. Confirm the specific SKU lists 16 GB RAM before checkout.\n\nARM laptops (Snapdragon) give fantastic battery life but can have app compatibility quirks — check the apps you rely on (some niche Windows desktop apps run differently). \nTom's Guide\n\nIf you need Windows + specific ports, verify port selection (some thin models trade ports for thinness).\n\nIf you want a direct shopping shortlist (links, current prices and exact SKUs under $1,000), tell me your preferred OS (Windows or macOS), desired screen size (13–14\" vs 15\"), and whether you need touchscreen/convertible — I’ll fetch current SKUs and prices.\n\nIf you want, I can now:\n\nPull current SKUs + prices (US / EU / Ukraine) and find exact 16GB configurations under $1,000, or\n\nBuild a one-row comparison table (weight, battery test hrs, CPU, storage, price) for your top 3 picks.\n\nWhich would you like next?",
+        "citations": [
+          {
+            "url": "https://www.theguardian.com/technology/2025/apr/10/apple-macbook-air-m4-review-the-laptop-to-beat-now-cheaper?utm_source=chatgpt.com",
+            "text": "The Guardian - Apple MacBook Air M4 review: the laptop to beat, now cheaper - April 10, 2025 — The 2025 Apple MacBook Air M4 is an impressive upgrade, delivering boosted performance, enhanced features, and a lower entry price. Priced from £999/$999/€1,199, it includes the powerful new M4 chip, a minimum of 16GB RAM, and improved energy efficiency, making it a top value premium laptop. Though the design remains unchanged since 2022, a stylish new light blue color is introduced. Internally, the M4 chip offers near-MacBook Pro performance despite lacking a fan, and the battery life is stellar—over 16 hours of light use, and more than 10 hours under heavy workloads. The updated 12MP webcam with Centre Stage and Desk View enhances virtual meetings, while macOS Sequoia 15.4 brings improved multitasking features and Apple Intelligence integration. The Air's build quality, keyboard, trackpad, and speakers remain outstanding. However, it includes only two USB-C ports and lacks Face ID, USB-A, and SD card slots. Storage and memory upgrades are fixed post-purchase and can be costly. Environmentally, the MacBook Air uses 55% recycled materials and is moderately repairable. With its balance of power, portability, battery life, and now lower price, it stands as the leading consumer laptop unless a Windows system is necessary."
+          },
+          {
+            "url": "https://www.windowscentral.com/hardware/asus/asus-zenbook-a14-2025-review?utm_source=chatgpt.com",
+            "text": "Windows Central - ASUS Zenbook A14 (2025) review: I still love the lightest, longest-lasting AI PC, even with the $100 price bump - March 9, 2025 — The ASUS Zenbook A14 (2025) is a standout ultra-light laptop that combines portability, a refined minimalist design, and impressive battery life. Weighing under 1kg, it packs a 70Whr battery, Snapdragon X chipset, and premium build using a magnesium alloy called \"Ceraluminum\" with military-grade durability. Despite its light frame, it includes a robust port selection with USB4, HDMI 2.1, and a headphone jack. The 14-inch Lumina OLED display offers vivid colors and strong HDR support, though its 60Hz resolution may feel limiting. Performance is optimal for casual computing, enhanced by 32GB RAM and 1TB SSD in the reviewed model. However, gaming and heavy workloads are constrained by the entry-level Snapdragon X and its GPU limitations. The keyboard and touchpad are well-designed and backed by useful ASUS software. It supports Windows Hello and Copilot+ AI features but lacks a fingerprint reader. Initially expected to launch at $900, the reviewed configuration is $1,099.99, making its value proposition less compelling. A base model with 16GB RAM and 512GB SSD is now available at $999.99. Despite the price hike, the Zenbook A14 remains a top contender for users seeking a lightweight, high-endurance Windows laptop focused on portability and design."
+          },
+          {
+            "url": "https://www.tomsguide.com/computing/laptops/lenovo-ideapad-slim-3x-review?utm_source=chatgpt.com",
+            "text": "Tom's Guide - Lenovo IdeaPad Slim 3x review: Incredible battery life has never been so affordable - July 31, 2025 — The Lenovo IdeaPad Slim 3x is a budget-friendly laptop priced at $749, primarily lauded for its exceptional battery life, lasting over 16 hours in testing. This makes it an ideal choice for students and casual users seeking all-day performance without the premium price. It offers solid value with features like a snappy keyboard, decent everyday performance backed by a Qualcomm Snapdragon CPU and 16GB RAM, and a lightweight build. However, it comes with a few compromises, including mediocre display brightness and color gamut, weak speaker volume, subpar gaming performance, and potential app compatibility issues due to its Arm-based processor. The laptop's performance is competitive with others in its price range, achieving better benchmark results than cheaper models like the Acer Aspire Go 15, and not far behind pricier competitors. Despite a few drawbacks, such as limited graphical capabilities and suboptimal multimedia experiences, its impressive battery life and usability make it an attractive option for budget-conscious buyers — especially when found on sale. The IdeaPad Slim 3x is a standout among budget laptops, particularly for users prioritizing long battery life over high-end performance."
+          },
+          {
+            "url": "https://digitalnomads.world/tips/acer-swift-3-2025-ryzen-edition-review/?utm_source=chatgpt.com",
+            "text": "Digital Nomad World - Review of the Acer Swift 3 (2025 Ryzen Edition) - July 20, 2025 — 20 Jul 2025 — Acer claims the Swift 3's 48 Wh battery can deliver up to 12 hours of web browsing, and in real-world tests, that's surprisingly close to the ..."
+          },
+          {
+            "url": "https://laptopmedia.com/review/lenovo-ideapad-slim-5i-16-gen-10-review-a-great-laptop-held-back-by-our-bad-choices/?utm_source=chatgpt.com",
+            "text": "LaptopMedia - Lenovo IdeaPad Slim 5i (16\", Gen 10) review - August 11, 2025 — 11 Aug 2025 — Battery Life. Lenovo IdeaPad Slim 5i's battery has a capacity of 60Wh. You can also order the Slim 5i with 50Wh or 80Wh battery. The test is ..."
+          },
+          {
+            "url": "https://www.thurrott.com/hardware/270788/hp-pavilion-plus-14-review?utm_source=chatgpt.com",
+            "text": "thurrott.com - HP Pavilion Plus 14 Review - 8 Aug 2022 — But the battery life—an average of just 3:35 in my testing—is abysmal, so you'll need to stay near a power source."
+          },
+          {
+            "url": "https://www.techradar.com/reviews/hp-pavilion-plus-14?utm_source=chatgpt.com",
+            "text": "techradar.com - HP Pavilion Plus 14 review: burns twice as bright for half ... - This battery cannot last past the four-and-a-half-hour mark in our HD movie test, and PCMark 10's battery test showed a five hour and 10 minute result, which ..."
+          },
+          {
+            "url": "https://www.youtube.com/watch?v=suDBxmKg-OQ&utm_source=chatgpt.com",
+            "text": "youtube.com - The HP Pavilion 14 Plus: Accidental Brilliance - We'll talk about real-world benchmarks, battery life, keyboard feel ... HP Pavilion Plus 14 Review (7840U & 780M) | Slap Tech. Slap Tech ..."
+          },
+          {
+            "url": "https://www.laptopmag.com/articles/best-laptops-under-1000-1?utm_source=chatgpt.com",
+            "text": "laptopmag.com - Best laptops under $1000 in 2025: 5 tested, reviewed picks - 22 Aug 2025 — The Acer Swift Go 14 features the Intel Core Ultra CPU, all-day-plus battery life, and performance that matches the MacBook — all for under ..."
+          },
+          {
+            "url": "https://www.laptopmag.com/reviews/hp-pavilion-14-2022-review-just-right?utm_source=chatgpt.com",
+            "text": "laptopmag.com - HP Pavilion 14 (2022) review: Just right - 30 Nov 2022 — During our Laptop Mag Battery test, consisting of continuous web surfing over Wi-Fi at 150 nits of brightness, the laptop lasted 5 hours and 50 ..."
+          },
+          {
+            "url": "https://www.pcvarge.com/acer-swift-3-sf314-59-75qc/?utm_source=chatgpt.com",
+            "text": "pcvarge.com - Acer Swift 3 SF314-59-75QC Review - VARGE - 3 Jun 2024 — Apparently, even last year's Swift 3 didn't have a battery that crossed the 10-hour mark. Acer claims that the SF314-59-75QC can last up to 16 ..."
+          },
+          {
+            "url": "https://www.notebookcheck.net/Dual-debut-in-the-Lenovo-IdeaPad-Slim-5-16-Ryzen-AI-5-330-and-Radeon-820M-in-review.1166676.0.html?utm_source=chatgpt.com",
+            "text": "notebookcheck.net - Dual debut in the Lenovo IdeaPad Slim 5 16: Ryzen AI 5 ... - 5 days ago — + excellent battery life. + privacy shutter. + fast Wi-Fi. Cons. - Radeon 820M is very slow. - weak speakers. - small colour gamut. - high ..."
+          },
+          {
+            "url": "https://www.notebookcheck.net/Dell-Inspiron-14-5000-Series.684801.0.html?utm_source=chatgpt.com",
+            "text": "notebookcheck.net - Dell Inspiron 14 5000 Series - The Inspiron scores points with a powerful Ryzen 5 APU (Barcelo), 16 GB of RAM, and very good battery life. Positive: USB-C Power Delivery is supported. Dell ..."
+          },
+          {
+            "url": "https://www.ultrabookreview.com/71699-asus-zenbook-14-2025-intel-review/?utm_source=chatgpt.com",
+            "text": "ultrabookreview.com - Asus Zenbook 14 UX3405CA longer-term review (2025 ... - 21 Aug 2025 — Battery life – not bad with Arrow Lake​​ There's a 75 Wh battery inside this 2025 Asus Zenbook 14, plenty sized for its segment."
+          },
+          {
+            "url": "https://www.ultrabookreview.com/251-best-ultrabooks/?utm_source=chatgpt.com",
+            "text": "ultrabookreview.com - Best ultrabook and portable lightweight laptop in 2025 - 4 Nov 2025 — The Zenbook A14 is an excellent option for casual use, with Snapdragon hardware, snappy daily-use performance, and amazing battery life. It's ..."
+          },
+          {
+            "url": "https://www.ultrabookreview.com/16888-acer-swift-3-sf314-52-review/?utm_source=chatgpt.com",
+            "text": "ultrabookreview.com - Acer Swift 3 SF314-52 review - budget 14-inch laptop with ... - Battery life · 7.7 W (~6 h of use) – very light browsing and text editing in Google Drive, Balanced Mode, screen at 50%, Wi-Fi ON; · 5.8 W (~8 of use) – 1080p ..."
+          },
+          {
+            "url": "https://www.ultrabookreview.com/71706-asus-zenbook-14-2025-amd-review/?utm_source=chatgpt.com",
+            "text": "ultrabookreview.com - Asus Zenbook 14 UM3406KA longer-term review (2025 ... - 21 Aug 2025 — Battery life – excellent runtimes with Krackan Point. There's a 75 Wh battery inside this 2025 Asus Zenbook 14, plenty sized for its segment."
+          },
+          {
+            "url": "https://www.ultrabookreview.com/39834-lenovo-ideapad-5-14are-review/?utm_source=chatgpt.com",
+            "text": "ultrabookreview.com - Lenovo IdeaPad 5 14ARE05 review (AMD Rzyen 5) - There's a 57 Wh battery inside the IdeaPad 5, which is larger than what you'd normally get on an affordable 14-incher. With the efficient AMD hardware ..."
+          },
+          {
+            "url": "https://www.wps.com/blog/hp-pavilion-x360-review/?utm_source=chatgpt.com",
+            "text": "wps.com - HP Pavilion x360 Review: 14, 14 LTE, and 15-Inch Models - 11 Sept 2025 — Battery life is decent but not outstanding. The fan can be slightly noisy under heavy workloads. Not built for gaming or intense creative tasks ..."
+          },
+          {
+            "url": "https://www.wps.com/blog/asus-zenbook-14-oled-review-stunning-display-and-smart-portability/?utm_source=chatgpt.com",
+            "text": "wps.com - Asus Zenbook 14 OLED Review: Stunning Display & ... - 11 Sept 2025 — Yes, as per my own experience and notebookcheck, it's compact, lightweight, and offers long battery life, making it ideal for mobile ..."
+          },
+          {
+            "url": "https://www.reddit.com/r/ASUS/comments/1mlak0n/asus_zenbook_14_2025_review_after_1_month/?utm_source=chatgpt.com",
+            "text": "reddit.com - Asus Zenbook 14 (2025) - Review After 1 Month - Battery - I've never gotten more than 3 hours of battery life. Maybe 3.5 hours if I'm just scrolling through Facebook and working on documents."
+          },
+          {
+            "url": "https://www.reddit.com/r/Lenovo/comments/1kztgia/appreciation_post_lenovo_ideapad_slim_5_gen_10/?utm_source=chatgpt.com",
+            "text": "reddit.com - Lenovo IdeaPad Slim 5, Gen 10 (2025) 13.3\", Macbook ... - Battery life is very good, I was easily getting 9 hours SOT, though ... Can u provide full review like battery, build quality,hinges,any issue ..."
+          },
+          {
+            "url": "https://www.reddit.com/r/laptops/comments/197z8fh/what_are_the_pros_and_cons_of_purchasing_an_hp/?utm_source=chatgpt.com",
+            "text": "reddit.com - What are the pros and cons of purchasing an HP Pavilion ... - It's a normal budget laptop. So don't expect amazing build quality, screen(200-250nits), sound and heatsink. But it's okay for the price."
+          },
+          {
+            "url": "https://www.reddit.com/r/SuggestALaptop/comments/ho4zzw/how_good_or_bad_is_acer_swift_3/?utm_source=chatgpt.com",
+            "text": "reddit.com - How Good or Bad is Acer Swift 3? : r/SuggestALaptop - For your needs it's perfectly fine. Build quality and keyboard and everything is nice, you should enjoy it. If this is the best price or laptop ..."
+          },
+          {
+            "url": "https://www.hp.com/us-en/shop/reviews/hp-pavilion-laptop-14-dv2097nr?utm_source=chatgpt.com",
+            "text": "hp.com - Customer Reviews: HP Pavilion Laptop - Battery life tested by HP using continuous FHD video playback, 2K OLED non ... Starting in July 2025, the HP OmniBook 5 14\" inch model (configured with ..."
+          },
+          {
+            "url": "https://www.pcworld.com/article/2474360/dell-inspiron-14-2-in-1-review.html?utm_source=chatgpt.com",
+            "text": "pcworld.com - Dell Inspiron 14 2-in-1 review: A zippy laptop with loud ... - 7 Oct 2024 — The Dell Inspiron 14 2-in-1 offers reliable performance as well as speakers that scream loud, but the dull display and middling battery life leave little to be ..."
+          },
+          {
+            "url": "https://www.pcworld.com/article/2976850/lenovo-ideapad-slim-5i-review.html?utm_source=chatgpt.com",
+            "text": "pcworld.com - Lenovo IdeaPad Slim 5i review: A deceptively good deal - 1 day ago — The Lenovo IdeaPad Slim 5i has a 60 Watt-hour battery. That's not the largest battery, and this Intel Meteor Lake-based Core 5 210H chip isn't ..."
+          },
+          {
+            "url": "https://www.pcworld.com/article/2234142/hp-pavilion-plus-laptop-14-review.html?utm_source=chatgpt.com",
+            "text": "pcworld.com - HP Pavilion Plus Laptop 14 review: A zippy and affordable ... - 15 Feb 2024 — It has a longer battery life. For me, this simple upgrade ushers in a new era for the Pavilion brand, elevating it up a spot to nearer the more ..."
+          },
+          {
+            "url": "https://www.pcworld.com/article/630093/best-gaming-laptops-under-1000-2.html?utm_source=chatgpt.com",
+            "text": "pcworld.com - Tested! The best gaming laptops under $1000 in 2025 - Best budget gaming laptop deals available now! · HP Victus $569 ($41 off at Amazon) · MSI Thin A15 $679.99 ($120 off at Newegg) · Alienware 16 Aurora $1,099.98 ($ ..."
+          },
+          {
+            "url": "https://www.canbuyornot.com/reviews/acer-swift-3/?utm_source=chatgpt.com",
+            "text": "canbuyornot.com - Acer Swift 3 review: Excellent battery life - 12 Jan 2021 — But at around 1.2kg, the 14-inch Swift 3 is pretty portable, too. More importantly, its battery life — just 14 minutes shy of 12 hours — is ..."
+          },
+          {
+            "url": "https://www.expertreviews.co.uk/technology/laptops/hp-pavilion-se-14-review?utm_source=chatgpt.com",
+            "text": "expertreviews.co.uk - HP Pavilion SE 14 review: A fine, cheap laptop for ... - 24 Jan 2024 — The laptop's weak spot is its battery life. The rather low-capacity 41Wh capacity unit put the lights out after just 6hrs 30mins in our video ..."
+          },
+          {
+            "url": "https://www.rtings.com/laptop/reviews/best/battery-life?utm_source=chatgpt.com",
+            "text": "rtings.com - The 6 Best Laptops For Battery Life - Black Friday 2025 - 9 May 2025 — The best laptop for battery life we've tested is the Apple MacBook Pro 14 (2024). This premium workstation is the one to get if you want the best overall user ..."
+          },
+          {
+            "url": "https://www.rtings.com/laptop/reviews/asus/zenbook-a14-ux3407-2025?utm_source=chatgpt.com",
+            "text": "rtings.com - ASUS Zenbook A14 UX3407 (2025) Laptop Review - 9 Jun 2025 — Its compact design makes it easy to carry around, and its battery life is exceptional, lasting around 19 hours in light uses. The overall user ..."
+          },
+          {
+            "url": "https://www.creativebloq.com/tech/laptops/acer-swift-3-oled-review?utm_source=chatgpt.com",
+            "text": "creativebloq.com - Acer Swift 3 review: student laptop aces the back-to-school ... - 19 Sept 2024 — The Acer Swift 3 is a lightweight and affordable all-around laptop for students, but some compromises limit its scope."
+          },
+          {
+            "url": "https://www.bestlaptop.deals/articles/2025-asus-zenbook-14-review-great-value?utm_source=chatgpt.com",
+            "text": "bestlaptop.deals - 2025 ASUS Zenbook 14 Review - Best Laptop Deals - 25 Apr 2025 — Battery Life. In video playback tests, here are our results: AMD Zenbook gets around 19 hours while the intel only gets around 17. Video ..."
+          },
+          {
+            "url": "https://digitalnomads.world/tips/best-laptops-under-1000/?utm_source=chatgpt.com",
+            "text": "digitalnomads.world - Best Laptops Under $1000 in 2025 - 6 Jun 2025 — 1. Acer Swift 3 (2025) – Best Overall Value · 2. HP Pavilion Aero 13 – Best Lightweight Laptop · 3. ASUS Vivobook S15 OLED – Best Display · 4."
+          },
+          {
+            "url": "https://laptopmedia.com/review/acer-swift-16-ai-sf16-51-review-stunning-oled-epic-battery-life/?utm_source=chatgpt.com",
+            "text": "laptopmedia.com - Acer Swift 16 AI (SF16-51) review – Stunning OLED, Epic ... - 10 May 2025 — The battery life is just great. With 15 hours and 48 minutes on a single charge, Acer Swift 16 AI (SF16-51) is among the best in the 16-inch ..."
+          },
+          {
+            "url": "https://www.xda-developers.com/asus-zenbook-14-review/?utm_source=chatgpt.com",
+            "text": "xda-developers.com - Asus Zenbook 14 (2025) review: Windows' best kept secret - 26 Apr 2025 — It's a fantastic performer when it comes to battery life, too. Asus claims you can get up to 18 hours out of the Zenbook 14, but that's a little ..."
+          },
+          {
+            "url": "https://www.xda-developers.com/dell-inspiron-14-2-in-1-review/?utm_source=chatgpt.com",
+            "text": "xda-developers.com - Dell Inspiron 14 2-in-1 review: A mainstream laptop you ... - 24 Dec 2021 — Battery life is pretty good, averaging around six hours, but the problem is really performance while on battery life. Running PCMark 10, it ..."
+          },
+          {
+            "url": "https://blog-idceurope.com/a-review-of-the-lenovo-ideapad-pro-5-16iah10-and-lenovo-yoga-slim-7-15-15ill9/?utm_source=chatgpt.com",
+            "text": "blog-idceurope.com - A Review of the Lenovo IdeaPad Pro 5 16IAH10 with Intel ... - 25 Apr 2025 — In our test, the Lenovo IdeaPad Pro 5 achieved a video playback battery life of nine hours and three minutes. The battery level started at 100% ..."
+          },
+          {
+            "url": "https://laptopcraze.in/dell-inspiron-14-review-2025-features-price/?utm_source=chatgpt.com",
+            "text": "laptopcraze.in - Dell Inspiron 14 Review (2025) – Specs, Features & Price - 16 Nov 2025 — The Dell Inspiron 14 is a complete all-rounder laptop offering portability, solid performance, premium design, and excellent battery life. It's ..."
+          },
+          {
+            "url": "https://www.thegate.ca/tech-gadgets/038242/review-dell-inspiron-14-5000-2-in-1-5482-laptop/?utm_source=chatgpt.com",
+            "text": "thegate.ca - Review: Dell Inspiron 14 5000 2-in-1 (5482) laptop - 15 Mar 2019 — The Dell Inspiron 14 5000 2-in-1 has a touch sensitive 14′′ FHD IPS LED-backlit display that is crisp and clear, and the Intel UHD Graphics 620 card is more ..."
+          },
+          {
+            "url": "https://pedl.cepr.org/dfabecishop/picks/best-laptops-under-1000?utm_source=chatgpt.com",
+            "text": "cepr.org - The Best Laptops Under $1000 for 2025 - CEPR - 12 Aug 2025 — August 12, 2025: With this update, we added the Dell 14 Plus (DB14250) as our latest Best Laptop Under $1,000, replacing the discontinued Asus ..."
+          },
+          {
+            "url": "https://nanoreview.net/en/laptop-compare/lenovo-ideapad-pro-5i-16-gen-10-16-2025-vs-hp-omnibook-x-flip-16?utm_source=chatgpt.com",
+            "text": "nanoreview.net - Lenovo IdeaPad Pro 5i 16 Gen 10 (16\" 2025) vs HP ... - IdeaPad Pro 5i 16 Gen 10 (16\" 2025). 82. OmniBook X Flip 16\". 35. Battery Life. Potential battery life in light and average use. IdeaPad Pro 5i 16 Gen 10 (16\" ..."
+          },
+          {
+            "url": "https://www.asus.com/laptops/for-home/zenbook/asus-zenbook-a14-ux3407/?utm_source=chatgpt.com",
+            "text": "asus.com - ASUS Zenbook A14 (UX3407)｜Laptops For Home - ASUS Zenbook A14: Ultra-lightweight under 1 kg, up to 32-hour battery life, Snapdragon® X Series processor, AI PC, Ceraluminum™. For tech enthusiasts on the ..."
+          },
+          {
+            "url": "https://www.telegraph.co.uk/recommended/tech/dell-inspiron-14-review/?utm_source=chatgpt.com",
+            "text": "telegraph.co.uk - Dell Inspiron 14 review: capable and convincing budget ... - 14 Apr 2025 — Battery life. Score: 9/10. Dell Inspiron 14 review - Battery lasts 17 hours and 6 minutes. Despite only having a 54Wh battery, the Inspiron 14 ..."
+          },
+          {
+            "url": "https://www.theguardian.com/technology/2025/apr/10/apple-macbook-air-m4-review-the-laptop-to-beat-now-cheaper?utm_source=chatgpt.com",
+            "text": "The Guardian - The Guardian\nApple MacBook Air M4 review: the laptop to beat, now cheaper\nApril 10, 2025 — The 2025 Apple MacBook Air M4 is an impressive upgrade, delivering boosted performance, enhanced features, and a lower entry price. Priced from £999/$999/€1,199, it includes the powerful new M4 chip, a minimum of 16GB RAM, and improved energy efficiency, making it a top value premium laptop. Though the design remains unchanged since 2022, a stylish new light blue color is introduced. Internally, the M4 chip offers near-MacBook Pro performance despite lacking a fan, and the battery life is stellar—over 16 hours of light use, and more than 10 hours under heavy workloads. The updated 12MP webcam with Centre Stage and Desk View enhances virtual meetings, while macOS Sequoia 15.4 brings improved multitasking features and Apple Intelligence integration. The Air's build quality, keyboard, trackpad, and speakers remain outstanding. However, it includes only two USB-C ports and lacks Face ID, USB-A, and SD card slots. Storage and memory upgrades are fixed post-purchase and can be costly. Environmentally, the MacBook Air uses 55% recycled materials and is moderately repairable. With its balance of power, portability, battery life, and now lower price, it stands as the leading consumer laptop unless a Windows system is necessary."
+          },
+          {
+            "url": "https://www.windowscentral.com/hardware/asus/asus-zenbook-a14-2025-review?utm_source=chatgpt.com",
+            "text": "Windows Central - Windows Central\nASUS Zenbook A14 (2025) review: I still love the lightest, longest-lasting AI PC, even with the $100 price bump\nMarch 9, 2025 — The ASUS Zenbook A14 (2025) is a standout ultra-light laptop that combines portability, a refined minimalist design, and impressive battery life. Weighing under 1kg, it packs a 70Whr battery, Snapdragon X chipset, and premium build using a magnesium alloy called \"Ceraluminum\" with military-grade durability. Despite its light frame, it includes a robust port selection with USB4, HDMI 2.1, and a headphone jack. The 14-inch Lumina OLED display offers vivid colors and strong HDR support, though its 60Hz resolution may feel limiting. Performance is optimal for casual computing, enhanced by 32GB RAM and 1TB SSD in the reviewed model. However, gaming and heavy workloads are constrained by the entry-level Snapdragon X and its GPU limitations. The keyboard and touchpad are well-designed and backed by useful ASUS software. It supports Windows Hello and Copilot+ AI features but lacks a fingerprint reader. Initially expected to launch at $900, the reviewed configuration is $1,099.99, making its value proposition less compelling. A base model with 16GB RAM and 512GB SSD is now available at $999.99. Despite the price hike, the Zenbook A14 remains a top contender for users seeking a lightweight, high-endurance Windows laptop focused on portability and design."
+          },
+          {
+            "url": "https://www.tomsguide.com/computing/laptops/lenovo-ideapad-slim-3x-review?utm_source=chatgpt.com",
+            "text": "Tom's Guide - Tom's Guide\nLenovo IdeaPad Slim 3x review: Incredible battery life has never been so affordable\nJuly 31, 2025 — The Lenovo IdeaPad Slim 3x is a budget-friendly laptop priced at $749, primarily lauded for its exceptional battery life, lasting over 16 hours in testing. This makes it an ideal choice for students and casual users seeking all-day performance without the premium price. It offers solid value with features like a snappy keyboard, decent everyday performance backed by a Qualcomm Snapdragon CPU and 16GB RAM, and a lightweight build. However, it comes with a few compromises, including mediocre display brightness and color gamut, weak speaker volume, subpar gaming performance, and potential app compatibility issues due to its Arm-based processor. The laptop's performance is competitive with others in its price range, achieving better benchmark results than cheaper models like the Acer Aspire Go 15, and not far behind pricier competitors. Despite a few drawbacks, such as limited graphical capabilities and suboptimal multimedia experiences, its impressive battery life and usability make it an attractive option for budget-conscious buyers — especially when found on sale. The IdeaPad Slim 3x is a standout among budget laptops, particularly for users prioritizing long battery life over high-end performance."
+          },
+          {
+            "url": "https://digitalnomads.world/tips/acer-swift-3-2025-ryzen-edition-review/?utm_source=chatgpt.com",
+            "text": "Digital Nomad World - Digital Nomad World\nReview of the Acer Swift 3 (2025 Ryzen Edition)\nJuly 20, 2025 — 20 Jul 2025 — Acer claims the Swift 3's 48 Wh battery can deliver up to 12 hours of web browsing, and in real-world tests, that's surprisingly close to the ..."
+          },
+          {
+            "url": "https://laptopmedia.com/review/lenovo-ideapad-slim-5i-16-gen-10-review-a-great-laptop-held-back-by-our-bad-choices/?utm_source=chatgpt.com",
+            "text": "LaptopMedia - LaptopMedia\nLenovo IdeaPad Slim 5i (16\", Gen 10) review\nAugust 11, 2025 — 11 Aug 2025 — Battery Life. Lenovo IdeaPad Slim 5i's battery has a capacity of 60Wh. You can also order the Slim 5i with 50Wh or 80Wh battery. The test is ..."
+          },
+          {
+            "url": "https://www.thurrott.com/hardware/270788/hp-pavilion-plus-14-review?utm_source=chatgpt.com",
+            "text": "thurrott.com - thurrott.com\nHP Pavilion Plus 14 Review\n8 Aug 2022 — But the battery life—an average of just 3:35 in my testing—is abysmal, so you'll need to stay near a power source."
+          },
+          {
+            "url": "https://www.techradar.com/reviews/hp-pavilion-plus-14?utm_source=chatgpt.com",
+            "text": "techradar.com - techradar.com\nHP Pavilion Plus 14 review: burns twice as bright for half ...\nThis battery cannot last past the four-and-a-half-hour mark in our HD movie test, and PCMark 10's battery test showed a five hour and 10 minute result, which ..."
+          },
+          {
+            "url": "https://www.youtube.com/watch?v=suDBxmKg-OQ&utm_source=chatgpt.com",
+            "text": "youtube.com - youtube.com\nThe HP Pavilion 14 Plus: Accidental Brilliance\nWe'll talk about real-world benchmarks, battery life, keyboard feel ... HP Pavilion Plus 14 Review (7840U & 780M) | Slap Tech. Slap Tech ..."
+          },
+          {
+            "url": "https://www.laptopmag.com/articles/best-laptops-under-1000-1?utm_source=chatgpt.com",
+            "text": "laptopmag.com - laptopmag.com\nBest laptops under $1000 in 2025: 5 tested, reviewed picks\n22 Aug 2025 — The Acer Swift Go 14 features the Intel Core Ultra CPU, all-day-plus battery life, and performance that matches the MacBook — all for under ..."
+          },
+          {
+            "url": "https://www.laptopmag.com/reviews/hp-pavilion-14-2022-review-just-right?utm_source=chatgpt.com",
+            "text": "laptopmag.com - laptopmag.com\nHP Pavilion 14 (2022) review: Just right\n30 Nov 2022 — During our Laptop Mag Battery test, consisting of continuous web surfing over Wi-Fi at 150 nits of brightness, the laptop lasted 5 hours and 50 ..."
+          },
+          {
+            "url": "https://www.pcvarge.com/acer-swift-3-sf314-59-75qc/?utm_source=chatgpt.com",
+            "text": "pcvarge.com - pcvarge.com\nAcer Swift 3 SF314-59-75QC Review - VARGE\n3 Jun 2024 — Apparently, even last year's Swift 3 didn't have a battery that crossed the 10-hour mark. Acer claims that the SF314-59-75QC can last up to 16 ..."
+          },
+          {
+            "url": "https://www.notebookcheck.net/Dual-debut-in-the-Lenovo-IdeaPad-Slim-5-16-Ryzen-AI-5-330-and-Radeon-820M-in-review.1166676.0.html?utm_source=chatgpt.com",
+            "text": "notebookcheck.net - notebookcheck.net\nDual debut in the Lenovo IdeaPad Slim 5 16: Ryzen AI 5 ...\n5 days ago — + excellent battery life. + privacy shutter. + fast Wi-Fi. Cons. - Radeon 820M is very slow. - weak speakers. - small colour gamut. - high ..."
+          },
+          {
+            "url": "https://www.notebookcheck.net/Dell-Inspiron-14-5000-Series.684801.0.html?utm_source=chatgpt.com",
+            "text": "notebookcheck.net - notebookcheck.net\nDell Inspiron 14 5000 Series\nThe Inspiron scores points with a powerful Ryzen 5 APU (Barcelo), 16 GB of RAM, and very good battery life. Positive: USB-C Power Delivery is supported. Dell ..."
+          },
+          {
+            "url": "https://www.ultrabookreview.com/71699-asus-zenbook-14-2025-intel-review/?utm_source=chatgpt.com",
+            "text": "ultrabookreview.com - ultrabookreview.com\nAsus Zenbook 14 UX3405CA longer-term review (2025 ...\n21 Aug 2025 — Battery life – not bad with Arrow Lake​​ There's a 75 Wh battery inside this 2025 Asus Zenbook 14, plenty sized for its segment."
+          },
+          {
+            "url": "https://www.ultrabookreview.com/251-best-ultrabooks/?utm_source=chatgpt.com",
+            "text": "ultrabookreview.com - ultrabookreview.com\nBest ultrabook and portable lightweight laptop in 2025\n4 Nov 2025 — The Zenbook A14 is an excellent option for casual use, with Snapdragon hardware, snappy daily-use performance, and amazing battery life. It's ..."
+          },
+          {
+            "url": "https://www.ultrabookreview.com/16888-acer-swift-3-sf314-52-review/?utm_source=chatgpt.com",
+            "text": "ultrabookreview.com - ultrabookreview.com\nAcer Swift 3 SF314-52 review - budget 14-inch laptop with ...\nBattery life · 7.7 W (~6 h of use) – very light browsing and text editing in Google Drive, Balanced Mode, screen at 50%, Wi-Fi ON; · 5.8 W (~8 of use) – 1080p ..."
+          },
+          {
+            "url": "https://www.ultrabookreview.com/71706-asus-zenbook-14-2025-amd-review/?utm_source=chatgpt.com",
+            "text": "ultrabookreview.com - ultrabookreview.com\nAsus Zenbook 14 UM3406KA longer-term review (2025 ...\n21 Aug 2025 — Battery life – excellent runtimes with Krackan Point. There's a 75 Wh battery inside this 2025 Asus Zenbook 14, plenty sized for its segment."
+          },
+          {
+            "url": "https://www.ultrabookreview.com/39834-lenovo-ideapad-5-14are-review/?utm_source=chatgpt.com",
+            "text": "ultrabookreview.com - ultrabookreview.com\nLenovo IdeaPad 5 14ARE05 review (AMD Rzyen 5)\nThere's a 57 Wh battery inside the IdeaPad 5, which is larger than what you'd normally get on an affordable 14-incher. With the efficient AMD hardware ..."
+          },
+          {
+            "url": "https://www.wps.com/blog/hp-pavilion-x360-review/?utm_source=chatgpt.com",
+            "text": "wps.com - wps.com\nHP Pavilion x360 Review: 14, 14 LTE, and 15-Inch Models\n11 Sept 2025 — Battery life is decent but not outstanding. The fan can be slightly noisy under heavy workloads. Not built for gaming or intense creative tasks ..."
+          },
+          {
+            "url": "https://www.wps.com/blog/asus-zenbook-14-oled-review-stunning-display-and-smart-portability/?utm_source=chatgpt.com",
+            "text": "wps.com - wps.com\nAsus Zenbook 14 OLED Review: Stunning Display & ...\n11 Sept 2025 — Yes, as per my own experience and notebookcheck, it's compact, lightweight, and offers long battery life, making it ideal for mobile ..."
+          },
+          {
+            "url": "https://www.reddit.com/r/ASUS/comments/1mlak0n/asus_zenbook_14_2025_review_after_1_month/?utm_source=chatgpt.com",
+            "text": "reddit.com - reddit.com\nAsus Zenbook 14 (2025) - Review After 1 Month\nBattery - I've never gotten more than 3 hours of battery life. Maybe 3.5 hours if I'm just scrolling through Facebook and working on documents."
+          },
+          {
+            "url": "https://www.reddit.com/r/Lenovo/comments/1kztgia/appreciation_post_lenovo_ideapad_slim_5_gen_10/?utm_source=chatgpt.com",
+            "text": "reddit.com - reddit.com\nLenovo IdeaPad Slim 5, Gen 10 (2025) 13.3\", Macbook ...\nBattery life is very good, I was easily getting 9 hours SOT, though ... Can u provide full review like battery, build quality,hinges,any issue ..."
+          },
+          {
+            "url": "https://www.reddit.com/r/laptops/comments/197z8fh/what_are_the_pros_and_cons_of_purchasing_an_hp/?utm_source=chatgpt.com",
+            "text": "reddit.com - reddit.com\nWhat are the pros and cons of purchasing an HP Pavilion ...\nIt's a normal budget laptop. So don't expect amazing build quality, screen(200-250nits), sound and heatsink. But it's okay for the price."
+          },
+          {
+            "url": "https://www.reddit.com/r/SuggestALaptop/comments/ho4zzw/how_good_or_bad_is_acer_swift_3/?utm_source=chatgpt.com",
+            "text": "reddit.com - reddit.com\nHow Good or Bad is Acer Swift 3? : r/SuggestALaptop\nFor your needs it's perfectly fine. Build quality and keyboard and everything is nice, you should enjoy it. If this is the best price or laptop ..."
+          },
+          {
+            "url": "https://www.hp.com/us-en/shop/reviews/hp-pavilion-laptop-14-dv2097nr?utm_source=chatgpt.com",
+            "text": "hp.com - hp.com\nCustomer Reviews: HP Pavilion Laptop\nBattery life tested by HP using continuous FHD video playback, 2K OLED non ... Starting in July 2025, the HP OmniBook 5 14\" inch model (configured with ..."
+          },
+          {
+            "url": "https://www.pcworld.com/article/2474360/dell-inspiron-14-2-in-1-review.html?utm_source=chatgpt.com",
+            "text": "pcworld.com - pcworld.com\nDell Inspiron 14 2-in-1 review: A zippy laptop with loud ...\n7 Oct 2024 — The Dell Inspiron 14 2-in-1 offers reliable performance as well as speakers that scream loud, but the dull display and middling battery life leave little to be ..."
+          },
+          {
+            "url": "https://www.pcworld.com/article/2976850/lenovo-ideapad-slim-5i-review.html?utm_source=chatgpt.com",
+            "text": "pcworld.com - pcworld.com\nLenovo IdeaPad Slim 5i review: A deceptively good deal\n1 day ago — The Lenovo IdeaPad Slim 5i has a 60 Watt-hour battery. That's not the largest battery, and this Intel Meteor Lake-based Core 5 210H chip isn't ..."
+          },
+          {
+            "url": "https://www.pcworld.com/article/2234142/hp-pavilion-plus-laptop-14-review.html?utm_source=chatgpt.com",
+            "text": "pcworld.com - pcworld.com\nHP Pavilion Plus Laptop 14 review: A zippy and affordable ...\n15 Feb 2024 — It has a longer battery life. For me, this simple upgrade ushers in a new era for the Pavilion brand, elevating it up a spot to nearer the more ..."
+          },
+          {
+            "url": "https://www.pcworld.com/article/630093/best-gaming-laptops-under-1000-2.html?utm_source=chatgpt.com",
+            "text": "pcworld.com - pcworld.com\nTested! The best gaming laptops under $1000 in 2025\nBest budget gaming laptop deals available now! · HP Victus $569 ($41 off at Amazon) · MSI Thin A15 $679.99 ($120 off at Newegg) · Alienware 16 Aurora $1,099.98 ($ ..."
+          },
+          {
+            "url": "https://www.canbuyornot.com/reviews/acer-swift-3/?utm_source=chatgpt.com",
+            "text": "canbuyornot.com - canbuyornot.com\nAcer Swift 3 review: Excellent battery life\n12 Jan 2021 — But at around 1.2kg, the 14-inch Swift 3 is pretty portable, too. More importantly, its battery life — just 14 minutes shy of 12 hours — is ..."
+          },
+          {
+            "url": "https://www.expertreviews.co.uk/technology/laptops/hp-pavilion-se-14-review?utm_source=chatgpt.com",
+            "text": "expertreviews.co.uk - expertreviews.co.uk\nHP Pavilion SE 14 review: A fine, cheap laptop for ...\n24 Jan 2024 — The laptop's weak spot is its battery life. The rather low-capacity 41Wh capacity unit put the lights out after just 6hrs 30mins in our video ..."
+          },
+          {
+            "url": "https://www.rtings.com/laptop/reviews/best/battery-life?utm_source=chatgpt.com",
+            "text": "rtings.com - rtings.com\nThe 6 Best Laptops For Battery Life - Black Friday 2025\n9 May 2025 — The best laptop for battery life we've tested is the Apple MacBook Pro 14 (2024). This premium workstation is the one to get if you want the best overall user ..."
+          },
+          {
+            "url": "https://www.rtings.com/laptop/reviews/asus/zenbook-a14-ux3407-2025?utm_source=chatgpt.com",
+            "text": "rtings.com - rtings.com\nASUS Zenbook A14 UX3407 (2025) Laptop Review\n9 Jun 2025 — Its compact design makes it easy to carry around, and its battery life is exceptional, lasting around 19 hours in light uses. The overall user ..."
+          },
+          {
+            "url": "https://www.creativebloq.com/tech/laptops/acer-swift-3-oled-review?utm_source=chatgpt.com",
+            "text": "creativebloq.com - creativebloq.com\nAcer Swift 3 review: student laptop aces the back-to-school ...\n19 Sept 2024 — The Acer Swift 3 is a lightweight and affordable all-around laptop for students, but some compromises limit its scope."
+          },
+          {
+            "url": "https://www.bestlaptop.deals/articles/2025-asus-zenbook-14-review-great-value?utm_source=chatgpt.com",
+            "text": "bestlaptop.deals - bestlaptop.deals\n2025 ASUS Zenbook 14 Review - Best Laptop Deals\n25 Apr 2025 — Battery Life. In video playback tests, here are our results: AMD Zenbook gets around 19 hours while the intel only gets around 17. Video ..."
+          },
+          {
+            "url": "https://digitalnomads.world/tips/best-laptops-under-1000/?utm_source=chatgpt.com",
+            "text": "digitalnomads.world - digitalnomads.world\nBest Laptops Under $1000 in 2025\n6 Jun 2025 — 1. Acer Swift 3 (2025) – Best Overall Value · 2. HP Pavilion Aero 13 – Best Lightweight Laptop · 3. ASUS Vivobook S15 OLED – Best Display · 4."
+          },
+          {
+            "url": "https://laptopmedia.com/review/acer-swift-16-ai-sf16-51-review-stunning-oled-epic-battery-life/?utm_source=chatgpt.com",
+            "text": "laptopmedia.com - laptopmedia.com\nAcer Swift 16 AI (SF16-51) review – Stunning OLED, Epic ...\n10 May 2025 — The battery life is just great. With 15 hours and 48 minutes on a single charge, Acer Swift 16 AI (SF16-51) is among the best in the 16-inch ..."
+          },
+          {
+            "url": "https://www.xda-developers.com/asus-zenbook-14-review/?utm_source=chatgpt.com",
+            "text": "xda-developers.com - xda-developers.com\nAsus Zenbook 14 (2025) review: Windows' best kept secret\n26 Apr 2025 — It's a fantastic performer when it comes to battery life, too. Asus claims you can get up to 18 hours out of the Zenbook 14, but that's a little ..."
+          },
+          {
+            "url": "https://www.xda-developers.com/dell-inspiron-14-2-in-1-review/?utm_source=chatgpt.com",
+            "text": "xda-developers.com - xda-developers.com\nDell Inspiron 14 2-in-1 review: A mainstream laptop you ...\n24 Dec 2021 — Battery life is pretty good, averaging around six hours, but the problem is really performance while on battery life. Running PCMark 10, it ..."
+          },
+          {
+            "url": "https://blog-idceurope.com/a-review-of-the-lenovo-ideapad-pro-5-16iah10-and-lenovo-yoga-slim-7-15-15ill9/?utm_source=chatgpt.com",
+            "text": "blog-idceurope.com - blog-idceurope.com\nA Review of the Lenovo IdeaPad Pro 5 16IAH10 with Intel ...\n25 Apr 2025 — In our test, the Lenovo IdeaPad Pro 5 achieved a video playback battery life of nine hours and three minutes. The battery level started at 100% ..."
+          },
+          {
+            "url": "https://laptopcraze.in/dell-inspiron-14-review-2025-features-price/?utm_source=chatgpt.com",
+            "text": "laptopcraze.in - laptopcraze.in\nDell Inspiron 14 Review (2025) – Specs, Features & Price\n16 Nov 2025 — The Dell Inspiron 14 is a complete all-rounder laptop offering portability, solid performance, premium design, and excellent battery life. It's ..."
+          },
+          {
+            "url": "https://www.thegate.ca/tech-gadgets/038242/review-dell-inspiron-14-5000-2-in-1-5482-laptop/?utm_source=chatgpt.com",
+            "text": "thegate.ca - thegate.ca\nReview: Dell Inspiron 14 5000 2-in-1 (5482) laptop\n15 Mar 2019 — The Dell Inspiron 14 5000 2-in-1 has a touch sensitive 14′′ FHD IPS LED-backlit display that is crisp and clear, and the Intel UHD Graphics 620 card is more ..."
+          },
+          {
+            "url": "https://pedl.cepr.org/dfabecishop/picks/best-laptops-under-1000?utm_source=chatgpt.com",
+            "text": "cepr.org - cepr.org\nThe Best Laptops Under $1000 for 2025 - CEPR\n12 Aug 2025 — August 12, 2025: With this update, we added the Dell 14 Plus (DB14250) as our latest Best Laptop Under $1,000, replacing the discontinued Asus ..."
+          },
+          {
+            "url": "https://nanoreview.net/en/laptop-compare/lenovo-ideapad-pro-5i-16-gen-10-16-2025-vs-hp-omnibook-x-flip-16?utm_source=chatgpt.com",
+            "text": "nanoreview.net - nanoreview.net\nLenovo IdeaPad Pro 5i 16 Gen 10 (16\" 2025) vs HP ...\nIdeaPad Pro 5i 16 Gen 10 (16\" 2025). 82. OmniBook X Flip 16\". 35. Battery Life. Potential battery life in light and average use. IdeaPad Pro 5i 16 Gen 10 (16\" ..."
+          },
+          {
+            "url": "https://www.asus.com/laptops/for-home/zenbook/asus-zenbook-a14-ux3407/?utm_source=chatgpt.com",
+            "text": "asus.com - asus.com\nASUS Zenbook A14 (UX3407)｜Laptops For Home\nASUS Zenbook A14: Ultra-lightweight under 1 kg, up to 32-hour battery life, Snapdragon® X Series processor, AI PC, Ceraluminum™. For tech enthusiasts on the ..."
+          },
+          {
+            "url": "https://www.telegraph.co.uk/recommended/tech/dell-inspiron-14-review/?utm_source=chatgpt.com",
+            "text": "telegraph.co.uk - telegraph.co.uk\nDell Inspiron 14 review: capable and convincing budget ...\n14 Apr 2025 — Battery life. Score: 9/10. Dell Inspiron 14 review - Battery lasts 17 hours and 6 minutes. Despite only having a 54Wh battery, the Inspiron 14 ..."
+          }
+        ],
+        "timestamp": "2025-11-25T15:46:28.307403"
+      }
+    ]
+  },
+  {
+    "prompt_id": "2",
+    "prompt": "Help me choose a 4K TV for a small living room. I prefer something lightweight and energy-efficient",
+    "answers": [
+      {
+        "run_number": 1,
+        "response": "Good question! Choosing a 4K TV for a small living room with a focus on lightweight and energy efficiency means thinking carefully about size, power consumption, and what “lightweight” means in TV design. Here’s a breakdown of what to consider + some concrete model suggestions + trade-offs.\n\nWhat to Think About When Buying\n\nScreen Size\n\nFor a small living room, something like 43–55 inches is often ideal. At that distance, you get a good viewing experience without the TV overwhelming the space.\n\nAccording to guides, 43″ TVs are a very balanced size for compact rooms. \ne-katalog.pl\n+1\n\nPower Consumption\n\nSmaller LED TVs (especially with direct-LED backlights) can be quite efficient: for example, a 43″ LED TV may draw in the range of 35–50 W typical during use. \nCornwall Solar Company\n\nCheck the energy efficiency class (in EU/Ukraine this is often labeled A–G).\n\nLook at the spec sheet for power consumption per 1,000 hours of use — that gives a better sense of long-term electricity cost.\n\nWeight\n\nLighter TVs make wall-mounting easier, or even repositioning.\n\nFor example, the LG 43NANO80A3B weighs 8.9 kg. \nimeitech.lv\n+1\n\nSlim, ultra-thin bezels and LED TVs (vs. heavier backlighting systems) help reduce weight.\n\nPanel Technology\n\nLED (LCD) is generally energy-efficient, especially in smaller sizes.\n\nOLED can be efficient for dark scenes, but brightness/high HDR scenes may use more power; also, some OLEDs do maintenance cycles (pixel-refresh) that draw power. \nReddit\n+1\n\nMini-LED / QLED: bright and good picture, but might consume more power depending on backlight.\n\nSmart Features & Power Modes\n\nUse energy-saving modes: brightness reduction, automatic standby, etc.\n\nMany TVs let you control brightness dynamically, which saves power. \nReddit\n\nCheck the standby consumption — good TVs might draw very little when off (e.g., 0.5 W).\n\nRecommended 4K TVs\n\nHere are some 4K TVs that could match what you’re looking for — relatively compact, reasonably light, and with decent energy characteristics.\n\nLG NanoCell 43″ 4K\n14 543,96 UAH\n•\nSintas\nGeneric 43″ 4K Smart LED\n11 982,01 UAH\n•\nBlackTree\nGoogle‑TV 55″ 4K LED\n11 937,91 UAH\n•\nMicroless.com\nTornado 55″ 4K Frameless\n8 469,01 UAH\n•\nTijarahub\nSamsung 50/55″ 4K Ultra HD\n19 078,86 UAH\n•\nIpertech\nLG NanoCell 43NANO80 (Energy‑efficient)\n14 543,96 UAH\n•\nSintas\nVu 50–55″ 4K QLED\n11 390,89 UAH\n•\nMahajan Electronics\nTornado 55″ 4K (another model)\n8 469,01 UAH\n•\nTijarahub\n\nHere are a few highlights + commentary:\n\nLG NanoCell 43″ 4K (43NANO80): One of the best for a small room — very manageable size, light weight (8.9 kg), and decent power consumption (54 kWh per 1000 h in SDR). \nDatagate\n+1\n\n43″ 4K Ultra HD Smart LED: A generic but affordable 43″ model; good if you don’t need top-tier features.\n\n55″ Google‑TV 4K LED: Larger screen, but still small enough for many living rooms; Google TV gives flexible smart functionality.\n\nTornado 55″ 4K Frameless: Sleek design with minimal bezels, could make a more “floating” look.\n\nSamsung 4K Ultra HD Smart TV: More options in size; Samsung tends to be reliable and has good energy-saving software.\n\nTrade-Offs to Consider\n\nBigger is not always better: Going for 55″ from 43″ gives more screen but also more power draw, and takes up more wall or shelf space.\n\nEnergy class G: Some smaller TVs still fall in the lower efficiency classes (G), so \"energy-efficient\" is relative — check the exact model label. For example, the LG NanoCell 43NANO80 has class G. \npolycomp.bg\n\nBrightness vs Efficiency: If you want a very bright picture (for HDR or daytime viewing), brighter backlights will use more energy. If you're okay with a moderately bright image, you can save more.\n\nMy Recommendation (Based on Your Priorities)\n\nGiven that you said small living room, lightweight, and energy-efficient:\n\nMy top pick would be the LG NanoCell 43NANO80: it's small, light, and a good balance of features + power use.\n\nIf you want something a bit larger (for more “cinema feel”), go for a 55″ Google-TV LED — but make sure you mount it well and use energy-saving settings.\n\nUse a wall mount (if possible) — saves space and makes the TV feel less “heavy” in the room.\n\nIf you like, I can check current 4K TV models available in Kyiv / Ukrainian online stores (with up-to-date prices and energy ratings) and pick ones that match your preferences — do you want me to do that?",
+        "citations": [
+          {
+            "url": "https://e-katalog.pl/ua/post/6438/160-budget-4k-tvs-with-43-inch-diagonal/?utm_source=chatgpt.com",
+            "text": "e-katalog.pl - Найкращі бюджетні 4K-телевізори 43\" | Каталог цін E-Katalog"
+          },
+          {
+            "url": "https://cornwallsolarcompany.com/tv-wattage?utm_source=chatgpt.com",
+            "text": "Cornwall Solar Company - How Many Watts Does a TV Use? (Television Wattage Test) - Cornwall Solar Company - October 23, 2024"
+          },
+          {
+            "url": "https://imeitech.lv/en/tv-audio-video/televisions-and-accessories/tv-s/43nano80a3b-lg-tv-set-lg-43-4k-ultra-hd-3840-x-2160-pixels-flat-16-9-led-43nano80a3b-p46442?utm_source=chatgpt.com",
+            "text": "imeitech.lv - LG TV Set|LG|43 \"|4K Ultra HD|3840 x 2160 pixels|Flat|16:9|LED|43NANO80A3B"
+          },
+          {
+            "url": "https://www.reddit.com/r/LGOLED/comments/1j9kzlg?utm_source=chatgpt.com",
+            "text": "Reddit - 65\" LG B2 15W power consumption for 4 hours after turning it off - March 12, 2025"
+          },
+          {
+            "url": "https://www.reddit.com/r/OLED/comments/187c6gw?utm_source=chatgpt.com",
+            "text": "Reddit - What exactly does Samsung TV Energy Saving Solution do? - November 30, 2023"
+          },
+          {
+            "url": "https://datagate.ee/tv-video-audio-photo/tvs-and-video/tv/tv-setlg43-4k-ultra-hd3840-x-2160-pixelsflat169led43nano80a3b/?utm_source=chatgpt.com",
+            "text": "Datagate - TV Set|LG|43 \"|4K Ultra HD|3840 x 2160 pixels|Flat|16:9|LED|43NANO80A3B - TV - TVs and video - Datagate.ee"
+          },
+          {
+            "url": "https://polycomp.bg/poly/LG/0006301404269/0006302288104/vendor?request_locale=en_US&utm_source=chatgpt.com",
+            "text": "polycomp.bg - LG >> LG телевизори >> Телевизори 43\""
+          },
+          {
+            "url": "https://itc.ua/ua/articles/rejtyng-smart-televizoriv-4k-top-10-nedorogyh-modelej-v-ukrayini/?utm_source=chatgpt.com",
+            "text": "itc.ua - Рейтинг смарт-телевізорів 4К – Топ 10 недорогих моделей в Україні - March 24, 2023 — Статті Пристрої 24.03.2023 РЕЙТИНГ СМАРТ-ТЕЛЕВІЗОРІВ 4К – ТОП 10 НЕДОРОГИХ МОДЕЛЕЙ В УКРАЇНІ Дмитро Спасюк Автор статей та оглядів 4K-телевізори вже не розкіш, а стандарт при купівлі. Особливо, як..."
+          },
+          {
+            "url": "https://energyguide.org.uk/most-energy-efficient-tv/?utm_source=chatgpt.com",
+            "text": "energyguide.org.uk - Most Energy Efficient TVs in the UK (2025 Guide) - January 4, 2023 — ENERGY EFFICIENT TVS SUMMARY TABLE: Model | Size | Tech | kWh/1000h | Est. Annual Cost --- | --- | --- | --- | --- LG 32LQ63006LA | 32″ | LED | 35 | £9.86 Samsung UE43CU8000 | 43″ | LED |..."
+          },
+          {
+            "url": "https://rozetka.com.ua/ua/all-tv/c80037/21667%3D25512%3B25849%3D21238/?utm_source=chatgpt.com",
+            "text": "rozetka.com.ua - Телевізори 4К Smart TV - ROZETKA | Купити телевізор 4К Smart TV у Києві: ціна, відгуки, продаж - 1. На головну 2.  / Смартфони, ТВ і електроніка 3.  /  Телевізори ТЕЛЕВІЗОРИ 4К SMART TV Фільтри (2) Від дешевих до дорогих Від дорогих до дешевих Новинки За рейтингом Кришталево чисте зображення..."
+          },
+          {
+            "url": "https://rozetka.com.ua/ua/all-tv/c80037/21667%3D25512/?utm_source=chatgpt.com",
+            "text": "rozetka.com.ua - Телевізори Ultra HD 4K - ROZETKA | Купити телевізор Ultra HD 4K у Києві: ціна, відгуки, продаж - 1. На головну 2.  / Смартфони, ТВ і електроніка 3.  /  Телевізори ТЕЛЕВІЗОРИ ULTRA HD 4K Фільтри (1) Від дешевих до дорогих Від дорогих до дешевих Новинки За рейтингом На ринку побутової техніки з..."
+          },
+          {
+            "url": "https://comfy.ua/ua/flat-tvs/podderzhka_videorezhima__4k-ultra-hd-3840x2160__tip_matricu__lcd/?utm_source=chatgpt.com",
+            "text": "comfy.ua - Телевізори c матрицею LCD з роздільною здатністю 4k Ultra HD 3840x2160 купити за низькою ціною в Києві, Україні. Найнижча ціна на телевізори в інтернет магазині COMFY (Комфі) - ТЕЛЕВІЗОРИ C МАТРИЦЕЮ LCD З РОЗДІЛЬНОЮ ЗДАТНІСТЮ 4K ULTRA HD 3840X2160 9 моделей / сторінка 1 3 Наявнiсть Тільки в наявності 7 Діючі Акції ДОСТАВИМО за 1₴ у відділення 1 Оплата Частинами 9 Креди..."
+          },
+          {
+            "url": "https://comfy.ua/ua/flat-tvs/podderzhka_videorezhima__4k-ultra-hd-3840x2160__tv_razv_diapazon__60-gc/?utm_source=chatgpt.com",
+            "text": "comfy.ua - Телевізори з роздільною здатністю 4k Ultra HD 3840x2160 c частотою розгортки екрану 60 Гц купити за низькою ціною в Києві, Україні. Найнижча ціна на телевізори в інтернет магазині COMFY (Комфі) - ПОДИВІТЬСЯ ЩЕ ВІДГУКИ ДО ТОВАРІВ Відгук про Телевизор LG 50NANO81A6A 22 листопада 2025 Придбав цей телевізор у вітальню і можу сказати, що діагональ 50 дюймів — це ідеальний розмір для домашнього к..."
+          },
+          {
+            "url": "https://comfy.ua/ua/flat-tvs/podderzhka_videorezhima__4k-ultra-hd-3840x2160/?utm_source=chatgpt.com",
+            "text": "comfy.ua - Телевізор 4K купити в Києві, Україні ➤ 4K телевізори ціна в інтернет-магазині - COMFY - ТЕЛЕВІЗОРИ З РОЗДІЛЬНОЮ ЗДАТНІСТЮ 4К ULTRA HD — ПРЕКРАСНИЙ ВИБІР ДЛЯ ТИХ, ХТО ЦІНУЄ ІДЕАЛЬНУ ЯКІСТЬ ЗОБРАЖЕННЯ На зміну далеко не новому Full HD прийшов новий формат — 4К телевізор, що характеризуєть..."
+          },
+          {
+            "url": "https://comfy.ua/ua/flat-tvs/naznach_tv_mv__domashnij-kinoteatr__podderzhka_videorezhima__4k-ultra-hd-3840x2160/?utm_source=chatgpt.com",
+            "text": "comfy.ua - Телевізори з роздільною здатністю 4k Ultra HD 3840x2160 домашні кінотеатри купити за низькою ціною в Києві, Україні. Найнижча ціна на телевізори в інтернет магазині COMFY (Комфі) - ПОДИВІТЬСЯ ЩЕ ВІДГУКИ ДО ТОВАРІВ Відгук про Телевизор Samsung QE55QN70FAUXUA 17 листопада 2025 Дуже задоволена покупкою.Якість зображення вражаюча.Насичені та натуральні кольори.Бренд,як завжди,на..."
+          },
+          {
+            "url": "https://toptech.lt/en/televizoriai/tv-setlg43-4k-ultra-hd3840-x-2160-pixelsflat16-9led43nano80a3b?utm_source=chatgpt.com",
+            "text": "toptech.lt - TV Set|LG|43 \"|4K Ultra HD|3840 x 2160 pixels|Flat|16:9|LED|43NANO80A3 - TV SET|LG|43 \"|4K ULTRA HD|3840 X 2160 PIXELS|FLAT|16:9|LED|43NANO80A3B €293.90 Tax included Pristatymas į namus nuo: 3.63 € 1 - 3 darbo dienos 43 \" | Flat | 16:9 | 3840 x 2160 pixels | Smart TV..."
+          },
+          {
+            "url": "https://ecomp.lt/en/mobile/product/137444-tv-setlg43-4k-ultra-hd3840-x-2160-pixelsflat16-9led43nano80a3b?utm_source=chatgpt.com",
+            "text": "ecomp.lt - TV Set|LG|43 \"|4K Ultra HD|3840 x 2160 pixels|Flat|16:9|LED|43NANO80A3 - NETWORK (BLUETOOTH) | Yes | Yes | | NETWORK (ETHERNET LAN) | Yes | Yes | | NETWORK (WI-FI) | Yes | Yes | | DESIGN (PANEL MOUNTING INTERFACE) | 200 x 200 mm | 200 x 200 mm | | DESIG..."
+          },
+          {
+            "url": "https://poltava.to/news/83661/?utm_source=chatgpt.com",
+            "text": "poltava.to - Як обрати телевізор у 2025 році: 4K, QLED чи OLED та що таке Smart TV / Полтавщина - 11 травня 2025, 13:55 Розмір тексту ЯК ОБРАТИ ТЕЛЕВІЗОР У 2025 РОЦІ: 4K, QLED ЧИ OLED ТА ЩО ТАКЕ SMART TV Сучасний телевізор — це вже не просто «ящик» для перегляду ефірних каналів, а повноцінний му..."
+          },
+          {
+            "url": "https://www.multitronic.fi/en/products/4583839?utm_source=chatgpt.com",
+            "text": "multitronic.fi - LG 43NANO81A3A 43\" 4K NanoCell LED webOS TV, 60Hz, HDR10 - Multitronic - Image: logo | Multitronic Oy Myllärinkatu 10 65100 Vaasa | Web: www.multitronic.fi Telephone: 06 - 319 77 00 E-mail: info@multitronic.fi LG 43NANO81A3A 43\" 4K NANOCELL LED WEBOS TV, 60HZ, HDR10 Ma..."
+          },
+          {
+            "url": "https://marsietis.lt/en/tv-set-lg-43-4k-ultra-hd-3840-x-2160-pixels-flat-16-9-led-43nano80a3b-746713?utm_source=chatgpt.com",
+            "text": "marsietis.lt - TV Set, LG, 43 \", 4K Ultra HD, 3840 x 2160 pixels, Flat, 16:9, LED, 43NANO80A3B | Marsietis.lt - Image * PRODUCTS * GPS / ACCESSORIES / PARTS * COMPUTERS / ACCESSORIES / PARTS * TABLETS / ACCESSORIES / PARTS * PHONES / ACCESSORIES / PARTS * AUTO * MOTO * VIDEO / AUDIO * MONITORING EQUIPMENT * HE..."
+          },
+          {
+            "url": "https://ek.ua/ua/post/6440/160-4k-tvs-with-55-inch-screen/?utm_source=chatgpt.com",
+            "text": "ek.ua - Найкращі бюджетні 4К-телевізори з екраном 55 дюймів | Каталог цін E-Katalog - Каталог статей   /   ТВ та відеотехніка   /   Телевізори НАЙКРАЩІ БЮДЖЕТНІ 4К-ТЕЛЕВІЗОРИ З ЕКРАНОМ 55 ДЮЙМІВ Сергій Кравченко Автор статей, редактор рубрики 9 хв оновлено 26 серпня, 2025 Сьогодн..."
+          },
+          {
+            "url": "https://ek.ua/post/6437/160-budget-4k-tvs-with-43-inch-diagonal/?utm_source=chatgpt.com",
+            "text": "ek.ua - Найкращі бюджетні 4K телевізори 43\" | Каталог цін E-Katalog - Каталог статей   /   ТВ та відеотехніка   /   Телевізори НАЙКРАЩІ БЮДЖЕТНІ 4K ТЕЛЕВІЗОРИ 43\" Віталій Пацай Автор статей, редактор рубрики 8 хв оновлено 26 серпня, 2025 Якщо ви хочете телевізор і..."
+          },
+          {
+            "url": "https://www.ctrs.com.ua/televizory/diagonal_43/naznachenie_dlya-gostinoy/?utm_source=chatgpt.com",
+            "text": "ctrs.com.ua - Телевізори с диагональю 43'' Для вітальні ᐈ Купити Телевізори с диагональю 43'' Для вітальні в Києві і Україні с диагональю 43'', Для вітальні за низькою ціною від 9199 грн в інтернет-магазині Цитрус - * Телевізори та мультимедіа * Телевізори ТЕЛЕВІЗОРИ С ДИАГОНАЛЬЮ 43\" ДЛЯ ВІТАЛЬНІ СОРТУВАННЯ за популярністю ФІЛЬТР 43 \", Для вітальні Фільтр Ви обрали:Діагональ: 43 \"Призначення: Для вітальні..."
+          },
+          {
+            "url": "https://www.toppc.lt/c/202-televizoriai/1286083-lg-tv-set-lg-43-4k-ultra-hd-3840-x-2160-pixels-flat-16-9-led-43nano80a3b?utm_source=chatgpt.com",
+            "text": "toppc.lt - LG TV Set|LG|43 \"|4K Ultra HD|3840 x 2160 pixels|Flat|16:9|LED|43NANO80A3B (43NANO80A3B) - Apple AirPlay 2 support Smart TV - Yes Bluetooth Network - Yes Bluetooth version Network - 5.1 Google applications Other features - Google Cast/Google Home Wi-Fi standards Network - Wi-Fi 5 (802.11ac)..."
+          },
+          {
+            "url": "https://www.tradeinn.com/techinn/en/lg-nanocell-43nano766qa-43-4k-mini-led-tv/139559114/p?utm_source=chatgpt.com",
+            "text": "tradeinn.com - LG NanoCell 43NANO766QA 43´´ 4K Mini LED TV Black | Techinn - Features of LG NanoCell 43NANO766QA 43´´ 4K Mini LED LG - Television - Televisions Color: Black Connectivities: Wi-Fi Connectivities: Smart TV Inches: 43.0-49.0 Connections: HDMI Connections: Ether..."
+          },
+          {
+            "url": "https://priceinfo.eu/tvs/lg-nanocell-43nano77?utm_source=chatgpt.com",
+            "text": "priceinfo.eu - LG NanoCell 43NANO77 - LG NANOCELL 43NANO77 109.2 CM (43\") 4K ULTRA HD SMART TV Compare Manufacturer: LG Model: 43NANO773PA EAN: 8806091224552 LG NanoCell 43NANO77. Display diagonal: 109.2 cm (43\"), Display resolution:..."
+          },
+          {
+            "url": "https://e-katalog.pl/ua/post/6438/160-budget-4k-tvs-with-43-inch-diagonal/?utm_source=chatgpt.com",
+            "text": "e-katalog.pl - e-katalog.pl\nНайкращі бюджетні 4K-телевізори 43\" | Каталог цін E-Katalog"
+          },
+          {
+            "url": "https://cornwallsolarcompany.com/tv-wattage?utm_source=chatgpt.com",
+            "text": "Cornwall Solar Company - Cornwall Solar Company\nHow Many Watts Does a TV Use? (Television Wattage Test) - Cornwall Solar Company\nOctober 23, 2024"
+          },
+          {
+            "url": "https://imeitech.lv/en/tv-audio-video/televisions-and-accessories/tv-s/43nano80a3b-lg-tv-set-lg-43-4k-ultra-hd-3840-x-2160-pixels-flat-16-9-led-43nano80a3b-p46442?utm_source=chatgpt.com",
+            "text": "imeitech.lv - imeitech.lv\nLG TV Set|LG|43 \"|4K Ultra HD|3840 x 2160 pixels|Flat|16:9|LED|43NANO80A3B"
+          },
+          {
+            "url": "https://www.reddit.com/r/LGOLED/comments/1j9kzlg?utm_source=chatgpt.com",
+            "text": "Reddit - Reddit\n65\" LG B2 15W power consumption for 4 hours after turning it off\nMarch 12, 2025"
+          },
+          {
+            "url": "https://www.reddit.com/r/OLED/comments/187c6gw?utm_source=chatgpt.com",
+            "text": "Reddit - Reddit\nWhat exactly does Samsung TV Energy Saving Solution do?\nNovember 30, 2023"
+          },
+          {
+            "url": "https://datagate.ee/tv-video-audio-photo/tvs-and-video/tv/tv-setlg43-4k-ultra-hd3840-x-2160-pixelsflat169led43nano80a3b/?utm_source=chatgpt.com",
+            "text": "Datagate - Datagate\nTV Set|LG|43 \"|4K Ultra HD|3840 x 2160 pixels|Flat|16:9|LED|43NANO80A3B - TV - TVs and video - Datagate.ee"
+          },
+          {
+            "url": "https://polycomp.bg/poly/LG/0006301404269/0006302288104/vendor?request_locale=en_US&utm_source=chatgpt.com",
+            "text": "polycomp.bg - polycomp.bg\nLG >> LG телевизори >> Телевизори 43\""
+          },
+          {
+            "url": "https://itc.ua/ua/articles/rejtyng-smart-televizoriv-4k-top-10-nedorogyh-modelej-v-ukrayini/?utm_source=chatgpt.com",
+            "text": "itc.ua - itc.ua\nРейтинг смарт-телевізорів 4К – Топ 10 недорогих моделей в Україні\nMarch 24, 2023 — Статті Пристрої 24.03.2023 РЕЙТИНГ СМАРТ-ТЕЛЕВІЗОРІВ 4К – ТОП 10 НЕДОРОГИХ МОДЕЛЕЙ В УКРАЇНІ Дмитро Спасюк Автор статей та оглядів 4K-телевізори вже не розкіш, а стандарт при купівлі. Особливо, як..."
+          },
+          {
+            "url": "https://energyguide.org.uk/most-energy-efficient-tv/?utm_source=chatgpt.com",
+            "text": "energyguide.org.uk - energyguide.org.uk\nMost Energy Efficient TVs in the UK (2025 Guide)\nJanuary 4, 2023 — ENERGY EFFICIENT TVS SUMMARY TABLE: Model | Size | Tech | kWh/1000h | Est. Annual Cost --- | --- | --- | --- | --- LG 32LQ63006LA | 32″ | LED | 35 | £9.86 Samsung UE43CU8000 | 43″ | LED |..."
+          },
+          {
+            "url": "https://rozetka.com.ua/ua/all-tv/c80037/21667%3D25512%3B25849%3D21238/?utm_source=chatgpt.com",
+            "text": "rozetka.com.ua - rozetka.com.ua\nТелевізори 4К Smart TV - ROZETKA | Купити телевізор 4К Smart TV у Києві: ціна, відгуки, продаж\n1. На головну 2.  / Смартфони, ТВ і електроніка 3.  /  Телевізори ТЕЛЕВІЗОРИ 4К SMART TV Фільтри (2) Від дешевих до дорогих Від дорогих до дешевих Новинки За рейтингом Кришталево чисте зображення..."
+          },
+          {
+            "url": "https://rozetka.com.ua/ua/all-tv/c80037/21667%3D25512/?utm_source=chatgpt.com",
+            "text": "rozetka.com.ua - rozetka.com.ua\nТелевізори Ultra HD 4K - ROZETKA | Купити телевізор Ultra HD 4K у Києві: ціна, відгуки, продаж\n1. На головну 2.  / Смартфони, ТВ і електроніка 3.  /  Телевізори ТЕЛЕВІЗОРИ ULTRA HD 4K Фільтри (1) Від дешевих до дорогих Від дорогих до дешевих Новинки За рейтингом На ринку побутової техніки з..."
+          },
+          {
+            "url": "https://comfy.ua/ua/flat-tvs/podderzhka_videorezhima__4k-ultra-hd-3840x2160__tip_matricu__lcd/?utm_source=chatgpt.com",
+            "text": "comfy.ua - comfy.ua\nТелевізори c матрицею LCD з роздільною здатністю 4k Ultra HD 3840x2160 купити за низькою ціною в Києві, Україні. Найнижча ціна на телевізори в інтернет магазині COMFY (Комфі)\nТЕЛЕВІЗОРИ C МАТРИЦЕЮ LCD З РОЗДІЛЬНОЮ ЗДАТНІСТЮ 4K ULTRA HD 3840X2160 9 моделей / сторінка 1 3 Наявнiсть Тільки в наявності 7 Діючі Акції ДОСТАВИМО за 1₴ у відділення 1 Оплата Частинами 9 Креди..."
+          },
+          {
+            "url": "https://comfy.ua/ua/flat-tvs/podderzhka_videorezhima__4k-ultra-hd-3840x2160__tv_razv_diapazon__60-gc/?utm_source=chatgpt.com",
+            "text": "comfy.ua - comfy.ua\nТелевізори з роздільною здатністю 4k Ultra HD 3840x2160 c частотою розгортки екрану 60 Гц купити за низькою ціною в Києві, Україні. Найнижча ціна на телевізори в інтернет магазині COMFY (Комфі)\nПОДИВІТЬСЯ ЩЕ ВІДГУКИ ДО ТОВАРІВ Відгук про Телевизор LG 50NANO81A6A 22 листопада 2025 Придбав цей телевізор у вітальню і можу сказати, що діагональ 50 дюймів — це ідеальний розмір для домашнього к..."
+          },
+          {
+            "url": "https://comfy.ua/ua/flat-tvs/podderzhka_videorezhima__4k-ultra-hd-3840x2160/?utm_source=chatgpt.com",
+            "text": "comfy.ua - comfy.ua\nТелевізор 4K купити в Києві, Україні ➤ 4K телевізори ціна в інтернет-магазині - COMFY\nТЕЛЕВІЗОРИ З РОЗДІЛЬНОЮ ЗДАТНІСТЮ 4К ULTRA HD — ПРЕКРАСНИЙ ВИБІР ДЛЯ ТИХ, ХТО ЦІНУЄ ІДЕАЛЬНУ ЯКІСТЬ ЗОБРАЖЕННЯ На зміну далеко не новому Full HD прийшов новий формат — 4К телевізор, що характеризуєть..."
+          },
+          {
+            "url": "https://comfy.ua/ua/flat-tvs/naznach_tv_mv__domashnij-kinoteatr__podderzhka_videorezhima__4k-ultra-hd-3840x2160/?utm_source=chatgpt.com",
+            "text": "comfy.ua - comfy.ua\nТелевізори з роздільною здатністю 4k Ultra HD 3840x2160 домашні кінотеатри купити за низькою ціною в Києві, Україні. Найнижча ціна на телевізори в інтернет магазині COMFY (Комфі)\nПОДИВІТЬСЯ ЩЕ ВІДГУКИ ДО ТОВАРІВ Відгук про Телевизор Samsung QE55QN70FAUXUA 17 листопада 2025 Дуже задоволена покупкою.Якість зображення вражаюча.Насичені та натуральні кольори.Бренд,як завжди,на..."
+          },
+          {
+            "url": "https://toptech.lt/en/televizoriai/tv-setlg43-4k-ultra-hd3840-x-2160-pixelsflat16-9led43nano80a3b?utm_source=chatgpt.com",
+            "text": "toptech.lt - toptech.lt\nTV Set|LG|43 \"|4K Ultra HD|3840 x 2160 pixels|Flat|16:9|LED|43NANO80A3\nTV SET|LG|43 \"|4K ULTRA HD|3840 X 2160 PIXELS|FLAT|16:9|LED|43NANO80A3B €293.90 Tax included Pristatymas į namus nuo: 3.63 € 1 - 3 darbo dienos 43 \" | Flat | 16:9 | 3840 x 2160 pixels | Smart TV..."
+          },
+          {
+            "url": "https://ecomp.lt/en/mobile/product/137444-tv-setlg43-4k-ultra-hd3840-x-2160-pixelsflat16-9led43nano80a3b?utm_source=chatgpt.com",
+            "text": "ecomp.lt - ecomp.lt\nTV Set|LG|43 \"|4K Ultra HD|3840 x 2160 pixels|Flat|16:9|LED|43NANO80A3\nNETWORK (BLUETOOTH) | Yes | Yes | | NETWORK (ETHERNET LAN) | Yes | Yes | | NETWORK (WI-FI) | Yes | Yes | | DESIGN (PANEL MOUNTING INTERFACE) | 200 x 200 mm | 200 x 200 mm | | DESIG..."
+          },
+          {
+            "url": "https://poltava.to/news/83661/?utm_source=chatgpt.com",
+            "text": "poltava.to - poltava.to\nЯк обрати телевізор у 2025 році: 4K, QLED чи OLED та що таке Smart TV / Полтавщина\n11 травня 2025, 13:55 Розмір тексту ЯК ОБРАТИ ТЕЛЕВІЗОР У 2025 РОЦІ: 4K, QLED ЧИ OLED ТА ЩО ТАКЕ SMART TV Сучасний телевізор — це вже не просто «ящик» для перегляду ефірних каналів, а повноцінний му..."
+          },
+          {
+            "url": "https://www.multitronic.fi/en/products/4583839?utm_source=chatgpt.com",
+            "text": "multitronic.fi - multitronic.fi\nLG 43NANO81A3A 43\" 4K NanoCell LED webOS TV, 60Hz, HDR10 - Multitronic\nImage: logo | Multitronic Oy Myllärinkatu 10 65100 Vaasa | Web: www.multitronic.fi Telephone: 06 - 319 77 00 E-mail: info@multitronic.fi LG 43NANO81A3A 43\" 4K NANOCELL LED WEBOS TV, 60HZ, HDR10 Ma..."
+          },
+          {
+            "url": "https://marsietis.lt/en/tv-set-lg-43-4k-ultra-hd-3840-x-2160-pixels-flat-16-9-led-43nano80a3b-746713?utm_source=chatgpt.com",
+            "text": "marsietis.lt - marsietis.lt\nTV Set, LG, 43 \", 4K Ultra HD, 3840 x 2160 pixels, Flat, 16:9, LED, 43NANO80A3B | Marsietis.lt\nImage * PRODUCTS * GPS / ACCESSORIES / PARTS * COMPUTERS / ACCESSORIES / PARTS * TABLETS / ACCESSORIES / PARTS * PHONES / ACCESSORIES / PARTS * AUTO * MOTO * VIDEO / AUDIO * MONITORING EQUIPMENT * HE..."
+          },
+          {
+            "url": "https://ek.ua/ua/post/6440/160-4k-tvs-with-55-inch-screen/?utm_source=chatgpt.com",
+            "text": "ek.ua - ek.ua\nНайкращі бюджетні 4К-телевізори з екраном 55 дюймів | Каталог цін E-Katalog\nКаталог статей   /   ТВ та відеотехніка   /   Телевізори НАЙКРАЩІ БЮДЖЕТНІ 4К-ТЕЛЕВІЗОРИ З ЕКРАНОМ 55 ДЮЙМІВ Сергій Кравченко Автор статей, редактор рубрики 9 хв оновлено 26 серпня, 2025 Сьогодн..."
+          },
+          {
+            "url": "https://ek.ua/post/6437/160-budget-4k-tvs-with-43-inch-diagonal/?utm_source=chatgpt.com",
+            "text": "ek.ua - ek.ua\nНайкращі бюджетні 4K телевізори 43\" | Каталог цін E-Katalog\nКаталог статей   /   ТВ та відеотехніка   /   Телевізори НАЙКРАЩІ БЮДЖЕТНІ 4K ТЕЛЕВІЗОРИ 43\" Віталій Пацай Автор статей, редактор рубрики 8 хв оновлено 26 серпня, 2025 Якщо ви хочете телевізор і..."
+          },
+          {
+            "url": "https://www.ctrs.com.ua/televizory/diagonal_43/naznachenie_dlya-gostinoy/?utm_source=chatgpt.com",
+            "text": "ctrs.com.ua - ctrs.com.ua\nТелевізори с диагональю 43'' Для вітальні ᐈ Купити Телевізори с диагональю 43'' Для вітальні в Києві і Україні с диагональю 43'', Для вітальні за низькою ціною від 9199 грн в інтернет-магазині Цитрус\n* Телевізори та мультимедіа * Телевізори ТЕЛЕВІЗОРИ С ДИАГОНАЛЬЮ 43\" ДЛЯ ВІТАЛЬНІ СОРТУВАННЯ за популярністю ФІЛЬТР 43 \", Для вітальні Фільтр Ви обрали:Діагональ: 43 \"Призначення: Для вітальні..."
+          },
+          {
+            "url": "https://www.toppc.lt/c/202-televizoriai/1286083-lg-tv-set-lg-43-4k-ultra-hd-3840-x-2160-pixels-flat-16-9-led-43nano80a3b?utm_source=chatgpt.com",
+            "text": "toppc.lt - toppc.lt\nLG TV Set|LG|43 \"|4K Ultra HD|3840 x 2160 pixels|Flat|16:9|LED|43NANO80A3B (43NANO80A3B)\nApple AirPlay 2 support Smart TV - Yes Bluetooth Network - Yes Bluetooth version Network - 5.1 Google applications Other features - Google Cast/Google Home Wi-Fi standards Network - Wi-Fi 5 (802.11ac)..."
+          },
+          {
+            "url": "https://www.tradeinn.com/techinn/en/lg-nanocell-43nano766qa-43-4k-mini-led-tv/139559114/p?utm_source=chatgpt.com",
+            "text": "tradeinn.com - tradeinn.com\nLG NanoCell 43NANO766QA 43´´ 4K Mini LED TV Black | Techinn\nFeatures of LG NanoCell 43NANO766QA 43´´ 4K Mini LED LG - Television - Televisions Color: Black Connectivities: Wi-Fi Connectivities: Smart TV Inches: 43.0-49.0 Connections: HDMI Connections: Ether..."
+          },
+          {
+            "url": "https://priceinfo.eu/tvs/lg-nanocell-43nano77?utm_source=chatgpt.com",
+            "text": "priceinfo.eu - priceinfo.eu\nLG NanoCell 43NANO77\nLG NANOCELL 43NANO77 109.2 CM (43\") 4K ULTRA HD SMART TV Compare Manufacturer: LG Model: 43NANO773PA EAN: 8806091224552 LG NanoCell 43NANO77. Display diagonal: 109.2 cm (43\"), Display resolution:..."
+          }
+        ],
+        "timestamp": "2025-11-25T15:47:05.799389"
+      }
+    ]
+  }
+]

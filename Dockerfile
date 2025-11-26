@@ -41,7 +41,7 @@ RUN pip install --no-cache-dir playwright
 RUN playwright install chromium --with-deps
 
 # Copy application files
-COPY main.py ./
+COPY src/ ./src/
 COPY entrypoint.sh ./
 RUN chmod +x entrypoint.sh
 
