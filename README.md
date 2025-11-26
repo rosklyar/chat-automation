@@ -1,4 +1,4 @@
-# AI-assistants answers platform
+# AI-assistants Answers Platform
 
 ## Why
 
