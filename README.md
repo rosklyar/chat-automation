@@ -124,15 +124,9 @@ id,prompt
 ]
 ```
 
-### Video Tutorials
+### How it runs as a Docker image and can be scaled
 
-**1. How it utilizes Chromium and Playwright to automate ChatGPT interactions**
-
-<video src="https://github.com/rosklyar/chat-automation/raw/main/videos/gpt-automation.mp4" controls width="100%"></video>
-
-**2. How it runs as a Docker image and can be scaled**
-
-<video src="https://github.com/rosklyar/chat-automation/raw/main/videos/gpt-automation-dockerized.mp4" controls width="100%"></video>
+https://github.com/user-attachments/assets/a09b8bb0-af95-4ee1-aa93-09c393372a1a
 
 ## Quick Reference
 
