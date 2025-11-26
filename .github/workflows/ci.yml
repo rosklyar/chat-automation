@@ -1,43 +1,56 @@
 name: CI/CD
 
-on:
-  push:
-    branches: [ main, docs_and_ci_cd ]
-  pull_request:
-    branches: [ main ]
+on: [push, pull_request]
 
 jobs:
   test:
     runs-on: ubuntu-latest
 
-    strategy:
-      matrix:
-        python-version: ['3.11', '3.12']
+    # Add permissions for Docker access
+    permissions:
+      contents: read
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Install uv
-      uses: astral-sh/setup-uv@v3
+    - name: Set up Python
+      uses: actions/setup-python@v4
       with:
-        version: "latest"
+        python-version: '3.11'
 
-    - name: Set up Python ${{ matrix.python-version }}
-      run: uv python install ${{ matrix.python-version }}
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Start Docker daemon
+      run: |
+        sudo systemctl start docker
+        sudo docker info
+
+    - name: Install uv
+      run: pip install uv
+
+    - name: Cache uv dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/uv
+        key: ${{ runner.os }}-uv-${{ hashFiles('**/uv.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-uv-
 
     - name: Install dependencies
-      run: |
-        uv sync
-        uv add --dev pytest pytest-cov
+      run: uv sync
 
-    - name: Run tests
-      run: |
-        uv run pytest tests/ -v --cov=src --cov-report=term-missing
+    - name: Pull PostgreSQL Docker image with pgvector
+      run: docker pull pgvector/pgvector:pg15
 
-    - name: Check code can be imported
-      run: |
-        uv run python -c "from src import bot, create_session; print('✓ Imports successful')"
+    - name: Run tests with testcontainers
+      run: uv run pytest -v
+      env:
+        # Set Docker host for testcontainers
+        DOCKER_HOST: unix:///var/run/docker.sock
+        # Enable testcontainers logging for debugging
+        TESTCONTAINERS_LOG_LEVEL: DEBUG
 
   lint:
     runs-on: ubuntu-latest
