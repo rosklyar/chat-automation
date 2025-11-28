@@ -92,10 +92,16 @@ docker run --rm \
   chatgpt-automation \
   --input /app/prompts.csv \
   --sessions-dir /app/sessions \
-  --runs 10 \
+  --max-attempts 3 \
   --per-session-runs 5 \
   --output /app/results/output.json
 ```
+
+**How it works:**
+- The bot attempts to get an answer **with citations** for each prompt
+- If no citations found, retries up to `--max-attempts` times with the same session
+- After max attempts exhausted, switches to a new session and tries once more
+- If still no citations, saves an empty response and moves to next prompt
 
 **Input Format** (CSV):
 ```csv
@@ -142,7 +148,7 @@ mkdir sessions
 uv run src/create_session.py --output sessions/account1.json
 
 # Run automation
-uv run src/bot.py --sessions-dir sessions --input prompts.csv --runs 3
+uv run src/bot.py --sessions-dir sessions --input prompts.csv --max-attempts 3
 
 # Run tests
 uv run pytest
@@ -164,6 +170,6 @@ uv run pytest
 |----------|---------|---------|----------|
 | `--input` | Input CSV file | `/app/prompts.csv` | No (default: `prompts.csv`) |
 | `--sessions-dir` | Directory with session files | `/app/sessions` | **Yes** |
-| `--runs` | Runs per prompt | `10` | No (default: `1`) |
-| `--per-session-runs` | Runs before session switch | `5` | No (default: `10`) |
+| `--max-attempts` | Max attempts to get citations per prompt | `3` | No (default: `1`) |
+| `--per-session-runs` | Attempts before session switch | `5` | No (default: `10`) |
 | `--output` | Output JSON file | `/app/results/output.json` | No (default: `chatgpt_results.json`) |

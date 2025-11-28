@@ -20,7 +20,7 @@ mkdir sessions
 uv run src/create_session.py --output sessions/account1.json
 
 # Run the main application with saved sessions
-uv run src/bot.py --sessions-dir sessions --input prompts.csv --runs 3
+uv run src/bot.py --sessions-dir sessions --input prompts.csv --max-attempts 3
 
 # Run tests
 uv run pytest
@@ -69,26 +69,26 @@ The bot always uses session rotation mode - simply provide a directory with one 
 **For single session:** Put one file in the directory
 **For rotation:** Put multiple files in the directory
 
-Automatically rotates through sessions to distribute load and avoid rate limits:
+The bot automatically attempts to get answers **with citations** for each prompt:
 
 ```bash
-# Run 10 prompts with 5 runs each = 50 total runs
+# Try up to 3 times per prompt to get citations
 # 4 sessions in ./sessions directory
-# --per-session-runs 10 means each session handles 10 runs before switching
+# --per-session-runs 10 means each session handles 10 attempts before switching
 
-uv run src/bot.py --sessions-dir ./sessions --input prompts.csv --runs 5 --per-session-runs 10
+uv run src/bot.py --sessions-dir ./sessions --input prompts.csv --max-attempts 3 --per-session-runs 10
 ```
 
 **How it works:**
-- Session 1: runs 1-10 (first 2 prompts × 5 runs each)
-- Session 2: runs 11-20 (next 2 prompts × 5 runs each)
-- Session 3: runs 21-30 (next 2 prompts × 5 runs each)
-- Session 4: runs 31-40 (next 2 prompts × 5 runs each)
-- Session 1 (again): runs 41-50 (last 2 prompts × 5 runs each)
+- For each prompt, tries up to `--max-attempts` times to get an answer with citations
+- If no citations after max attempts, switches to a new session and tries once more
+- If still no citations, saves empty response and moves to next prompt
+- Sessions rotate automatically after `--per-session-runs` attempts
 
-**Session Rotation Parameters:**
+**Key Parameters:**
 - `--sessions-dir PATH` - Directory containing session .json files
-- `--per-session-runs N` - Number of runs per session before switching (default: 10)
+- `--max-attempts N` - Maximum attempts to get citations per prompt (default: 1)
+- `--per-session-runs N` - Number of attempts per session before switching (default: 10)
 
 ### Benefits
 

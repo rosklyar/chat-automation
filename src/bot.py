@@ -34,302 +34,242 @@ def handle_login_modal(page):
     return False
 
 
-def handle_welcome_back_modal(page):
+def authenticate_if_needed(page, max_attempts=2) -> bool:
     """
-    Handle the ChatGPT authentication modal by clicking "Continue with Google".
-    This handles both "Welcome back" modal and "Log in or sign up" page that can
-    appear after session load.
+    Handle authentication after loading ChatGPT with session.
+
+    Algorithm:
+    1. Wait 5 seconds for login modal to appear
+    2. If modal appears → handle it (3 types supported)
+    3. If no modal → check for "Log in" button in upper right
+    4. If "Log in" button absent → user is logged in
+    5. If "Log in" button present → click it and retry (step 1)
 
     Args:
         page: Playwright page object
+        max_attempts: Maximum number of login attempts (default: 2)
 
     Returns:
-        True if modal was handled, False if not present
+        True if authenticated successfully, False otherwise
     """
-    try:
-        print("Checking for authentication modal...")
 
-        # Debug: Print current page info
-        print(f"  Current URL: {page.url}")
-        try:
-            print(f"  Page title: {page.title()}")
-        except:
-            pass
+    for attempt in range(1, max_attempts + 1):
+        print(f"Authentication attempt {attempt}/{max_attempts}")
 
-        # Check if we're already at the chat interface (modal already dismissed or not needed)
-        try:
-            textarea = page.locator("#prompt-textarea")
-            if textarea.is_visible(timeout=1000):
-                print("✓ Already at chat interface, no authentication modal needed")
-                return False
-        except:
-            pass  # Not at chat interface yet, continue looking for modal
+        # STEP 1: Wait 5 seconds for any login modal to appear
+        print("Waiting 5 seconds for login modal...")
+        page.wait_for_timeout(5000)
 
-        # Wait for network to be idle to ensure modal is fully loaded
-        print("  Waiting for page to fully load...")
-        try:
-            page.wait_for_load_state("networkidle", timeout=10000)
-        except:
-            print("  Note: Network not idle, but continuing...")
-
-        # Check for EITHER "Welcome back" OR "Log in or sign up" modals
-        print("  Waiting for authentication modal to appear...")
         modal_detected = False
         modal_type = None
 
+        # Check for 3 types of modals
+        # Type 1: "Welcome back" with account selection
         try:
-            # Try "Welcome back" first
-            welcome_heading = page.locator('text="Welcome back"').first
-            welcome_heading.wait_for(state="visible", timeout=5000)
-            print("  ✓ 'Welcome back' modal detected!")
-            modal_detected = True
-            modal_type = "Welcome back"
-        except Exception as e:
-            print(f"  No 'Welcome back' modal found, checking for 'Log in or sign up'...")
-            try:
-                # Try "Log in or sign up"
-                login_heading = page.locator('text="Log in or sign up"').first
-                login_heading.wait_for(state="visible", timeout=5000)
-                print("  ✓ 'Log in or sign up' modal detected!")
+            welcome = page.locator('text="Welcome back"')
+            if welcome.is_visible(timeout=1000):
                 modal_detected = True
-                modal_type = "Log in or sign up"
-            except Exception as e2:
-                print(f"  No authentication modal appeared: {e2}")
-                return False
-
-        if not modal_detected:
-            print("  No authentication modal detected")
-            return False
-
-        # Give modal animations time to complete
-        page.wait_for_timeout(1500)
-
-        # Check for iframes (modal might be in an iframe)
-        frames = page.frames
-        print(f"  Checking {len(frames)} frames for the modal...")
-
-        # Save HTML for debugging
-        try:
-            html_content = page.content()
-            with open("auth_modal.html", "w", encoding="utf-8") as f:
-                f.write(html_content)
-            print("  HTML saved to auth_modal.html for debugging")
+                modal_type = "welcome_back"
+                print("✓ 'Welcome back' modal detected")
         except:
             pass
 
-        # Try multiple selector strategies for "Continue with Google" button
-        continue_button = None
+        # Type 2 & 3: "Log in or sign up" modal
+        if not modal_detected:
+            try:
+                login_modal = page.locator('text="Log in or sign up"')
+                if login_modal.is_visible(timeout=1000):
+                    modal_detected = True
+                    modal_type = "log_in_sign_up"
+                    print("✓ 'Log in or sign up' modal detected")
+            except:
+                pass
 
-        # Strategy 1: Direct button with exact text "Continue with Google"
+        # STEP 2: If modal appeared → handle it
+        if modal_detected:
+            if not handle_auth_modal(page, modal_type):
+                print("✗ Failed to handle authentication modal")
+                return False
+
+            # Wait for authentication to complete
+            print("Waiting for authentication to complete...")
+            page.wait_for_timeout(5000)
+
+            # Verify chat interface is ready
+            try:
+                textarea = page.locator("#prompt-textarea")
+                if textarea.is_visible(timeout=10000):
+                    print("✓ Authenticated successfully - chat interface ready")
+                    return True
+            except:
+                print("⚠ Chat interface not ready after authentication")
+                return False
+
+        # STEP 3: No modal appeared → check for "Log in" button
+        print("No modal appeared - checking for 'Log in' button...")
+
+        login_button = None
+
+        # Look for "Log in" button in upper right corner
         try:
-            print("  Strategy 1: Looking for button with text 'Continue with Google'...")
-            # Try both exact match and contains
-            selectors_to_try = [
-                'button:has-text("Continue with Google")',
-                'button:text("Continue with Google")',
-                'button:text-is("Continue with Google")',
-                '[role="button"]:has-text("Continue with Google")',
+            # Try multiple selectors
+            selectors = [
+                'button:has-text("Log in")',
+                'a:has-text("Log in")',
+                'header button:has-text("Log in")',
+                '[role="button"]:has-text("Log in")'
             ]
 
-            for selector in selectors_to_try:
+            for selector in selectors:
                 try:
                     btn = page.locator(selector).first
-                    if btn.count() > 0 and btn.is_visible(timeout=2000):
-                        continue_button = btn
-                        print(f"  ✓ Found button using selector: {selector}")
+                    if btn.is_visible(timeout=1000):
+                        login_button = btn
                         break
                 except:
                     continue
-
-        except Exception as e:
-            print(f"  Strategy 1 error: {e}")
-
-        # Strategy 2: Find button containing Google icon + text
-        if not continue_button:
-            try:
-                print("  Strategy 2: Looking for buttons with Google icon...")
-                all_buttons = page.locator("button").all()
-                print(f"  Found {len(all_buttons)} total buttons")
-
-                for idx, btn in enumerate(all_buttons):
-                    try:
-                        if not btn.is_visible():
-                            continue
-
-                        btn_text = btn.inner_text(timeout=500).strip()
-                        btn_html = btn.inner_html(timeout=500)
-
-                        # Look for Google-related content
-                        is_google_button = (
-                            ("Google" in btn_text or "google" in btn_text.lower()) and
-                            ("Continue" in btn_text or "continue" in btn_text.lower())
-                        ) or "google" in btn_html.lower()
-
-                        if is_google_button:
-                            print(f"  ✓ Found Google button (#{idx+1}): '{btn_text[:60]}'")
-                            continue_button = btn
-                            break
-                        else:
-                            # Debug: show all visible buttons
-                            if btn_text:
-                                print(f"    Button #{idx+1}: '{btn_text[:60]}'")
-                    except:
-                        continue
-
-            except Exception as e:
-                print(f"  Strategy 2 error: {e}")
-
-        # Strategy 3: Use get_by_role with name
-        if not continue_button:
-            try:
-                print("  Strategy 3: get_by_role...")
-                continue_button = page.get_by_role("button", name="Continue with Google")
-                if continue_button.count() == 0:
-                    continue_button = None
-                else:
-                    continue_button.wait_for(state="visible", timeout=3000)
-                    print("  ✓ Found button with get_by_role")
-            except Exception as e:
-                print(f"  Strategy 3 failed: {e}")
-                continue_button = None
-
-        # Strategy 4: Look in modal parent container (works for both "Welcome back" and "Log in or sign up")
-        if not continue_button:
-            try:
-                print(f"  Strategy 4: Looking in {modal_type} container...")
-                # Try to find container based on detected modal type
-                if modal_type == "Welcome back":
-                    modal_container = page.locator('text="Welcome back"').locator('..').locator('..')
-                else:  # "Log in or sign up"
-                    modal_container = page.locator('text="Log in or sign up"').locator('..').locator('..')
-
-                google_btn = modal_container.locator('button:has-text("Google")').first
-                if google_btn.count() > 0 and google_btn.is_visible(timeout=2000):
-                    continue_button = google_btn
-                    print(f"  ✓ Found button in {modal_type} container")
-            except Exception as e:
-                print(f"  Strategy 4 failed: {e}")
-
-        # If button found, click it
-        if continue_button:
-            try:
-                print(f"{modal_type} modal detected, attempting to click 'Continue with Google'...")
-
-                # Ensure button is visible and attached
-                continue_button.wait_for(state="visible", timeout=3000)
-                continue_button.wait_for(state="attached", timeout=3000)
-
-                # Get button details for debugging
-                try:
-                    btn_text = continue_button.inner_text(timeout=1000)
-                    print(f"  Button text: '{btn_text}'")
-                    bbox = continue_button.bounding_box()
-                    if bbox:
-                        print(f"  Button position: x={bbox['x']}, y={bbox['y']}, width={bbox['width']}, height={bbox['height']}")
-                except:
-                    pass
-
-                # Scroll into view
-                try:
-                    continue_button.scroll_into_view_if_needed(timeout=3000)
-                    page.wait_for_timeout(500)
-                except:
-                    print("  Note: Could not scroll, but continuing...")
-
-                # Try clicking with different methods
-                click_successful = False
-
-                # Method 1: Normal click
-                try:
-                    print("  Attempt 1: Normal click...")
-                    continue_button.click(timeout=5000)
-                    click_successful = True
-                    print("  ✓ Normal click succeeded")
-                except Exception as e:
-                    print(f"  Normal click failed: {e}")
-
-                # Method 2: Force click (bypass actionability checks)
-                if not click_successful:
-                    try:
-                        print("  Attempt 2: Force click...")
-                        continue_button.click(force=True, timeout=5000)
-                        click_successful = True
-                        print("  ✓ Force click succeeded")
-                    except Exception as e:
-                        print(f"  Force click failed: {e}")
-
-                # Method 3: JavaScript click
-                if not click_successful:
-                    try:
-                        print("  Attempt 3: JavaScript click...")
-                        continue_button.evaluate("el => el.click()")
-                        click_successful = True
-                        print("  ✓ JavaScript click succeeded")
-                    except Exception as e:
-                        print(f"  JavaScript click failed: {e}")
-
-                if not click_successful:
-                    print("  ✗ All click methods failed!")
-                    page.screenshot(path="auth_modal_click_failed.png")
-                    print("  Screenshot saved to auth_modal_click_failed.png")
-                    return False
-
-                print("✓ Clicked 'Continue with Google' button")
-
-                # Wait for authentication flow
-                print("  Waiting for authentication to complete...")
-
-                # Wait for URL change or chat interface
-                for wait_time in [3000, 5000, 5000]:
-                    page.wait_for_timeout(wait_time)
-
-                    # Check if chat interface appeared
-                    try:
-                        textarea = page.locator("#prompt-textarea")
-                        if textarea.is_visible(timeout=2000):
-                            print("✓ Chat interface ready after authentication!")
-                            return True
-                    except:
-                        print(f"  Still waiting... (checked after {wait_time}ms)")
-                        continue
-
-                # Final check with longer timeout
-                print("  Final check for chat interface...")
-                try:
-                    textarea = page.locator("#prompt-textarea")
-                    textarea.wait_for(timeout=10000, state="visible")
-                    print("✓ Chat interface ready after authentication")
-                    return True
-                except:
-                    print("⚠ Warning: Chat interface not ready, but authentication may have succeeded")
-                    return True
-
-            except Exception as e:
-                print(f"✗ Error during click/auth process: {e}")
-                try:
-                    page.screenshot(path="auth_modal_error.png")
-                    print("  Screenshot saved to auth_modal_error.png")
-                except:
-                    pass
-                return False
-        else:
-            print("✗ Could not find 'Continue with Google' button")
-            try:
-                page.screenshot(path="auth_modal_button_not_found.png")
-                print("  Screenshot saved to auth_modal_button_not_found.png")
-            except:
-                pass
-            return False
-
-    except Exception as e:
-        print(f"✗ Error during authentication modal check: {e}")
-        try:
-            page.screenshot(path="auth_modal_exception.png")
-            print("  Screenshot saved to auth_modal_exception.png")
         except:
             pass
 
+        # STEP 4: If "Log in" button absent → user is logged in
+        if not login_button:
+            print("No 'Log in' button found - verifying authentication...")
+
+            # Verify by checking chat interface
+            try:
+                textarea = page.locator("#prompt-textarea")
+                if textarea.is_visible(timeout=5000):
+                    print("✓ Already authenticated - chat interface ready")
+                    return True
+                else:
+                    print("✗ Neither modal nor chat interface found")
+                    return False
+            except:
+                print("✗ Authentication verification failed")
+                return False
+
+        # STEP 5: "Log in" button present → click it and retry
+        print("Found 'Log in' button - clicking to trigger modal...")
+
+        try:
+            login_button.click(timeout=5000)
+            print("Clicked 'Log in' button - will retry modal detection")
+            # Loop will continue to step 1 (wait 5 seconds for modal)
+        except Exception as e:
+            print(f"✗ Failed to click 'Log in' button: {e}")
+            return False
+
+    # Max attempts exceeded
+    print("✗ Authentication failed after maximum attempts")
     return False
+
+
+def handle_auth_modal(page, modal_type: str) -> bool:
+    """
+    Handle the detected authentication modal.
+
+    Supports 3 modal types:
+    1. "Welcome back" with account selection (email button)
+    2. "Welcome back" with "Continue with Google"
+    3. "Log in or sign up" with "Continue with Google"
+
+    Args:
+        page: Playwright page object
+        modal_type: Type of modal detected
+
+    Returns:
+        True if modal handled successfully, False otherwise
+    """
+
+    # Wait for modal to fully render
+    page.wait_for_timeout(1500)
+
+    auth_button = None
+
+    # Strategy 1: Look for account button (email pattern)
+    # This handles "Welcome back" with saved account
+    if modal_type == "welcome_back":
+        try:
+            import re
+            email_pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
+
+            # Look for button with email
+            all_clickable = page.locator('[role="button"]').all()
+            for elem in all_clickable:
+                try:
+                    if not elem.is_visible():
+                        continue
+
+                    elem_text = elem.inner_text(timeout=500).strip()
+                    elem_html = elem.inner_html(timeout=500)
+
+                    # Check if contains email
+                    has_email = re.search(email_pattern, elem_text) or re.search(email_pattern, elem_html)
+
+                    # Filter out close buttons
+                    aria_label = elem.get_attribute("aria-label") or ""
+                    is_remove = any(word in aria_label.lower() for word in ["remove", "close", "delete"])
+
+                    if has_email and not is_remove:
+                        bbox = elem.bounding_box()
+                        if bbox and bbox['width'] > 100:
+                            print(f"Found account button: {elem_text[:50]}")
+                            auth_button = elem
+                            break
+                except:
+                    continue
+        except:
+            pass
+
+    # Strategy 2: Look for "Continue with Google" button
+    if not auth_button:
+        try:
+            google_selectors = [
+                'button:has-text("Continue with Google")',
+                'button:text("Continue with Google")',
+                '[role="button"]:has-text("Continue with Google")'
+            ]
+
+            for selector in google_selectors:
+                try:
+                    btn = page.locator(selector).first
+                    if btn.is_visible(timeout=2000):
+                        print("Found 'Continue with Google' button")
+                        auth_button = btn
+                        break
+                except:
+                    continue
+        except:
+            pass
+
+    # Click button if found
+    if not auth_button:
+        print("✗ Could not find authentication button in modal")
+        page.screenshot(path="auth_modal_button_not_found.png")
+        return False
+
+    try:
+        # Click the button
+        auth_button.click(timeout=5000)
+        print("Clicked authentication button")
+
+        # Wait for modal to dismiss
+        page.wait_for_timeout(3000)
+
+        # Verify modal disappeared
+        try:
+            welcome = page.locator('text="Welcome back"')
+            if not welcome.is_visible(timeout=1000):
+                print("Modal dismissed")
+        except:
+            pass
+
+        return True
+
+    except Exception as e:
+        print(f"✗ Failed to click authentication button: {e}")
+        page.screenshot(path="auth_modal_click_failed.png")
+        return False
 
 
 def save_session(context, session_file: str):
@@ -390,15 +330,8 @@ def is_logged_in(page) -> bool:
         page.goto("https://chatgpt.com/", timeout=60000)
         page.wait_for_load_state("domcontentloaded")
 
-        # Handle "Welcome back" modal if it appears
-        handle_welcome_back_modal(page)
-
-        # Check for chat interface (indicates logged in)
-        textarea = page.locator("#prompt-textarea")
-        textarea.wait_for(timeout=10000, state="visible")
-
-        print("✓ Session validated - user is logged in")
-        return True
+        # Authenticate if needed using new unified function
+        return authenticate_if_needed(page)
     except Exception as e:
         print(f"⚠ Session validation failed: {e}")
         return False
@@ -517,55 +450,38 @@ def chatgpt_automation(prompt: str, prompt_id: str, run_number: int, output_file
     # Handle login modal if it appears
     handle_login_modal(page)
 
-    # Handle "Welcome back" modal if it appears
-    handle_welcome_back_modal(page)
-
-    # Wait for and locate the prompt input textarea
-    print("Waiting for chat interface...")
-
-    # ChatGPT's main textarea typically has id="prompt-textarea"
-    textarea = page.locator("#prompt-textarea")
-    try:
-        textarea.wait_for(timeout=30000)
-        print("✓ Chat interface ready!")
-    except Exception as e:
-        print(f"✗ Failed to find chat interface: {e}")
-        print(f"Current URL: {page.url}")
+    # Authenticate if needed using new unified function
+    if not authenticate_if_needed(page):
+        print("✗ Authentication failed")
         if own_browser:
             browser.close()
         return None
 
-    print(f"\nEntering prompt: {prompt}")
-    textarea.fill(prompt)
+    # Locate the prompt input textarea
+    textarea = page.locator("#prompt-textarea")
 
-    # Submit the prompt (press Enter or click send button)
+    print(f"Entering prompt: {prompt}")
+    textarea.fill(prompt)
     textarea.press("Enter")
 
-    print("Waiting for response to start...")
-    # Wait for the response to appear
+    print("Waiting for response...")
     page.wait_for_timeout(2000)
-
-    # Try multiple selectors to find the assistant's response
-    print("Looking for assistant response...")
 
     # Wait for generation to complete by checking for stop button disappearance
     try:
-        # Wait for stop button to disappear (generation complete)
         stop_button = page.locator('button[aria-label*="Stop"]')
         if stop_button.count() > 0:
-            print("Waiting for response generation to complete...")
             stop_button.wait_for(state="hidden", timeout=60000)
     except:
-        print("Stop button not found or already hidden, continuing...")
+        pass
 
     page.wait_for_timeout(2000)  # Extra wait to ensure content is rendered
 
-    print("\nScraping response...")
     response_text = None
 
     # Try different selectors for ChatGPT response
     selectors = [
-        '[data-message-author-role="assistant"] .markdown',  # More specific
+        '[data-message-author-role="assistant"] .markdown',
         '[data-message-author-role="assistant"]',
         'article[data-testid*="conversation-turn"] .markdown',
         'article[data-testid*="conversation-turn"]',
@@ -577,23 +493,16 @@ def chatgpt_automation(prompt: str, prompt_id: str, run_number: int, output_file
     for selector in selectors:
         try:
             messages = page.locator(selector).all()
-            print(f"  Trying '{selector}': found {len(messages)} elements")
             if messages and len(messages) > 0:
-                # Get the last message
                 response_text = messages[-1].inner_text()
-                if response_text and len(response_text) > 50:  # Reasonable length for actual response
-                    print(f"  ✓ Response found using: {selector}")
-                    print(f"  Response length: {len(response_text)} characters")
+                if response_text and len(response_text) > 50:
+                    print(f"✓ Response found ({len(response_text)} chars)")
                     break
-                elif response_text:
-                    print(f"    (Found but too short: {len(response_text)} chars)")
-        except Exception as e:
-            print(f"  Error with '{selector}': {e}")
+        except:
             continue
 
     # Fallback: Get all text from page and extract response
     if not response_text:
-        print("  Trying fallback method: extracting from full page text...")
         try:
             full_text = page.locator("body").inner_text()
 
@@ -616,24 +525,19 @@ def chatgpt_automation(prompt: str, prompt_id: str, run_number: int, output_file
 
             if response_lines:
                 response_text = "\n".join(response_lines)
-                print(f"  ✓ Response extracted from page text ({len(response_text)} chars)")
-        except Exception as e:
-            print(f"  Fallback method failed: {e}")
+                print(f"✓ Response extracted ({len(response_text)} chars)")
+        except:
+            pass
 
     if not response_text:
         response_text = "No response found"
-        print("\n⚠ Warning: Could not find response with any method")
+        print("⚠ Warning: Could not find response")
 
     # Extract sources if present
     sources = extract_sources(page)
 
-    # Save to JSON
-    save_to_json(prompt_id, prompt, run_number, response_text, sources, output_file)
-
-    print("✓ Response saved")
-
-    # Return browser context for potential reuse
-    return (browser, context, page)
+    # Return browser context, sources, and response text for citation checking and saving
+    return (browser, context, page, sources, response_text)
 
 
 def extract_sources(page):
@@ -1245,6 +1149,61 @@ def start_new_conversation(page):
         return False
 
 
+def has_citations(sources: list) -> bool:
+    """
+    Check if sources list contains valid citations.
+
+    Args:
+        sources: List of source dictionaries
+
+    Returns:
+        True if sources list is not empty and has valid entries, False otherwise
+    """
+    return sources is not None and len(sources) > 0
+
+
+def save_empty_response(prompt_id: str, prompt_text: str, output_file: str):
+    """
+    Save a prompt entry with empty answers array when all attempts to get citations failed.
+
+    Args:
+        prompt_id: ID of the prompt
+        prompt_text: The prompt text
+        output_file: Path to output JSON file
+    """
+    import json
+    from datetime import datetime
+
+    print("⚠ Saving prompt with empty answers - no citations found after all attempts")
+
+    # Load existing data
+    try:
+        with open(output_file, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        data = []
+
+    # Find or create prompt entry
+    prompt_entry = None
+    for entry in data:
+        if entry.get("prompt_id") == prompt_id:
+            prompt_entry = entry
+            break
+
+    if not prompt_entry:
+        # Create new entry with empty answers array
+        prompt_entry = {
+            "prompt_id": prompt_id,
+            "prompt": prompt_text,
+            "answers": []
+        }
+        data.append(prompt_entry)
+
+    # Save back to file
+    with open(output_file, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
+
 def save_to_json(prompt_id: str, prompt_text: str, run_number: int, response_text: str, sources: list, output_file: str):
     """Save prompt and response to JSON file with nested structure.
 
@@ -1424,10 +1383,10 @@ def parse_args():
         help="Path to input CSV file with prompts (default: prompts.csv)"
     )
     parser.add_argument(
-        "-r", "--runs",
+        "-r", "--max-attempts",
         type=int,
         default=1,
-        help="Number of runs per prompt in fresh conversations (default: 1)"
+        help="Maximum attempts to collect an answer with citations per prompt (default: 1)"
     )
     parser.add_argument(
         "-o", "--output",
@@ -1448,15 +1407,15 @@ def parse_args():
     return parser.parse_args()
 
 def main():
-    """Main function to orchestrate CSV processing and multiple runs with session rotation."""
+    """Main function to orchestrate CSV processing with citation-based retry logic."""
     args = parse_args()
 
     print(f"=== ChatGPT Automation ===")
     print(f"Input file: {args.input}")
-    print(f"Runs per prompt: {args.runs}")
+    print(f"Max attempts per prompt: {args.max_attempts}")
     print(f"Output file: {args.output}")
     print(f"Sessions directory: {args.sessions_dir}")
-    print(f"Per-session runs: {args.per_session_runs}")
+    print(f"Per-session attempts: {args.per_session_runs}")
     print()
 
     # Load all sessions from directory
@@ -1475,18 +1434,17 @@ def main():
         return
 
     total_prompts = len(prompts)
-    total_runs = total_prompts * args.runs
 
     print(f"Total prompts: {total_prompts}")
-    print(f"Total runs: {total_runs}")
+    print(f"Max attempts per prompt: {args.max_attempts}")
     print()
 
     # Session rotation setup
     current_session_idx = 0
-    runs_on_current_session = 0
+    attempts_on_current_session = 0
     browser_context = None
     page = None
-    completed_runs = 0
+    completed_prompts = 0
 
     # Start playwright once for the entire session (reused for all browser instances)
     print("Initializing Playwright...")
@@ -1503,18 +1461,22 @@ def main():
             print(f"Text: {prompt_text}")
             print(f"{'='*60}")
 
-            # Run N times for this prompt
-            for run in range(1, args.runs + 1):
-                completed_runs += 1
-                print(f"\n--- Run {run}/{args.runs} (Overall: {completed_runs}/{total_runs}) ---")
+            # Attempt to get answer with citations
+            attempt = 0
+            got_citations = False
+
+            # Try up to max_attempts with current session
+            while attempt < args.max_attempts and not got_citations:
+                attempt += 1
+                print(f"\n--- Attempt {attempt}/{args.max_attempts} ---")
 
                 # SESSION ROTATION LOGIC
                 # Check if we need to switch sessions
-                if runs_on_current_session >= args.per_session_runs or browser_context is None:
+                if attempts_on_current_session >= args.per_session_runs or browser_context is None:
                     # Close current browser if exists
                     if browser_context:
                         try:
-                            print(f"\nReached {runs_on_current_session} runs on current session, switching...")
+                            print(f"\nReached {attempts_on_current_session} attempts on current session, switching...")
                             browser, context = browser_context
                             browser.close()
                             print("✓ Closed previous browser")
@@ -1526,7 +1488,7 @@ def main():
                     # Switch to next session (cycle through sessions)
                     current_session_idx = (current_session_idx + 1) % len(session_files)
                     current_session_file = session_files[current_session_idx]
-                    runs_on_current_session = 0
+                    attempts_on_current_session = 0
 
                     print(f"Loading session {current_session_idx + 1}/{len(session_files)}: {os.path.basename(current_session_file)}")
 
@@ -1538,14 +1500,14 @@ def main():
                         print(f"✓ Ready to use session: {os.path.basename(current_session_file)}\n")
                     else:
                         print(f"✗ Failed to load session: {os.path.basename(current_session_file)}")
-                        print("⚠ Skipping this run...")
+                        print("⚠ Skipping this attempt...")
                         continue
 
-                runs_on_current_session += 1
-                print(f"[Session {current_session_idx + 1}/{len(session_files)}: {os.path.basename(session_files[current_session_idx])}, Run {runs_on_current_session}/{args.per_session_runs}]")
+                attempts_on_current_session += 1
+                print(f"[Session {current_session_idx + 1}/{len(session_files)}: {os.path.basename(session_files[current_session_idx])}, Attempt {attempts_on_current_session}/{args.per_session_runs}]")
 
-                # For runs after the first, start a new conversation
-                if browser_context and page and run > 1:
+                # For attempts after the first, start a new conversation
+                if browser_context and page and attempt > 1:
                     if not start_new_conversation(page):
                         print("⚠ Failed to start new conversation, will retry with fresh browser...")
                         if browser_context:
@@ -1554,7 +1516,7 @@ def main():
                         browser_context = None
                         page = None
                         # Will reload session on next iteration
-                        runs_on_current_session = args.per_session_runs  # Force session switch
+                        attempts_on_current_session = args.per_session_runs  # Force session switch
                         continue
 
                 # Execute automation
@@ -1562,7 +1524,7 @@ def main():
                     result = chatgpt_automation(
                         prompt=prompt_text,
                         prompt_id=prompt_id,
-                        run_number=run,
+                        run_number=attempt,
                         output_file=args.output,
                         page=page,
                         browser_context=browser_context
@@ -1571,14 +1533,30 @@ def main():
                     if result:
                         browser_context = (result[0], result[1])
                         page = result[2]
+                        sources = result[3]
+                        response_text = result[4]
+
+                        # Check if we got citations
+                        if has_citations(sources):
+                            print(f"✓ SUCCESS! Got answer with {len(sources)} citations")
+                            # Save the successful response with citations
+                            save_to_json(prompt_id, prompt_text, attempt, response_text, sources, args.output)
+                            print("✓ Response saved")
+                            got_citations = True
+                            completed_prompts += 1
+                            break  # Exit attempt loop, move to next prompt
+                        else:
+                            print(f"⚠ No citations in response (attempt {attempt}/{args.max_attempts})")
+                            if attempt < args.max_attempts:
+                                print("  Retrying with same session...")
                     else:
-                        print("⚠ Run failed, resetting browser...")
+                        print("⚠ Attempt failed, resetting browser...")
                         browser_context = None
                         page = None
-                        runs_on_current_session = args.per_session_runs  # Force session switch
+                        attempts_on_current_session = args.per_session_runs  # Force session switch
 
                 except Exception as e:
-                    print(f"✗ Error during run: {e}")
+                    print(f"✗ Error during attempt: {e}")
                     # Reset browser context on error
                     if browser_context:
                         try:
@@ -1588,7 +1566,79 @@ def main():
                             pass
                     browser_context = None
                     page = None
-                    runs_on_current_session = args.per_session_runs  # Force session switch
+                    attempts_on_current_session = args.per_session_runs  # Force session switch
+
+            # After max_attempts exhausted without citations
+            if not got_citations:
+                print(f"\n⚠ Max attempts ({args.max_attempts}) exhausted without citations")
+                print("  Switching to new session for one final attempt...")
+
+                # Force session switch
+                if browser_context:
+                    try:
+                        browser, context = browser_context
+                        browser.close()
+                    except:
+                        pass
+                    browser_context = None
+                    page = None
+
+                # Switch to next session
+                current_session_idx = (current_session_idx + 1) % len(session_files)
+                current_session_file = session_files[current_session_idx]
+                attempts_on_current_session = 0
+
+                print(f"Loading new session {current_session_idx + 1}/{len(session_files)}: {os.path.basename(current_session_file)}")
+
+                # Load and validate new session
+                result = load_and_validate_session(playwright, current_session_file)
+                if result:
+                    browser, context, page = result
+                    browser_context = (browser, context)
+                    print(f"✓ Ready to use new session\n")
+
+                    # Try once with new session
+                    try:
+                        print("--- Final attempt with new session ---")
+                        result = chatgpt_automation(
+                            prompt=prompt_text,
+                            prompt_id=prompt_id,
+                            run_number=1,
+                            output_file=args.output,
+                            page=page,
+                            browser_context=browser_context
+                        )
+
+                        if result:
+                            browser_context = (result[0], result[1])
+                            page = result[2]
+                            sources = result[3]
+                            response_text = result[4]
+                            attempts_on_current_session = 1
+
+                            # Check if we got citations with new session
+                            if has_citations(sources):
+                                print(f"✓ SUCCESS with new session! Got answer with {len(sources)} citations")
+                                # Save the successful response with citations
+                                save_to_json(prompt_id, prompt_text, 1, response_text, sources, args.output)
+                                print("✓ Response saved")
+                                got_citations = True
+                                completed_prompts += 1
+                            else:
+                                print("✗ New session attempt also failed - no citations")
+                        else:
+                            print("✗ New session attempt failed")
+
+                    except Exception as e:
+                        print(f"✗ Error during new session attempt: {e}")
+                else:
+                    print(f"✗ Failed to load new session")
+
+            # If still no citations after everything, save empty response
+            if not got_citations:
+                print(f"\n✗ All attempts failed for prompt {prompt_id}")
+                save_empty_response(prompt_id, prompt_text, args.output)
+                completed_prompts += 1
 
     finally:
         # Clean up browser
@@ -1608,7 +1658,7 @@ def main():
             print(f"Warning: Error stopping Playwright: {e}")
 
     print(f"\n{'='*60}")
-    print(f"✓ Completed {completed_runs}/{total_runs} runs")
+    print(f"✓ Completed {completed_prompts}/{total_prompts} prompts")
     print(f"✓ Results saved to {args.output}")
     print("Done!")
 
