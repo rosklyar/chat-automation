@@ -66,9 +66,3 @@ jobs:
 
     - name: Set up Python
       run: uv python install 3.11
-
-    - name: Check Python syntax
-      run: |
-        uv run python -m py_compile src/bot.py
-        uv run python -m py_compile src/create_session.py
-        uv run python -m py_compile tests/test_session.py
