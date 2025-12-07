@@ -17,7 +17,7 @@ This project automates interactions with the ChatGPT web application using Playw
 ```bash
 # Create session files (manual login)
 mkdir sessions
-uv run src/create_session.py --output sessions/account1.json
+uv run scripts/create_session.py --output sessions/account1.json
 
 # Run the main application with saved sessions
 uv run src/bot.py --sessions-dir sessions --input prompts.csv --max-attempts 3
@@ -35,45 +35,71 @@ uv add --dev <package-name>
 uv sync
 ```
 
+## Project Structure
+
+```
+chat-automation/
+    scripts/
+        create_session.py          # Standalone utility for session creation
+    src/
+        __init__.py                # Package exports
+        models.py                  # Data classes (SessionType, Citation, EvaluationResult, etc.)
+        session_provider.py        # SessionProvider protocol + FileSessionProvider
+        bot_interface.py           # Bot protocol definition
+        io_utils.py                # CSV reading, JSON saving utilities
+        bot.py                     # Main orchestration (Orchestrator class)
+        chatgpt/
+            __init__.py            # ChatGPT package exports
+            bot.py                 # ChatGPTBot implementation
+            auth.py                # Authentication handling (modals, login)
+            citation_extractor.py  # Citation/source extraction
+    tests/
+        ...
+```
+
+## Key Abstractions
+
+### SessionProvider
+Manages session lifecycle, rotation, and usage tracking.
+- `get_session(session_type)` - Get available session
+- `record_evaluation(session_id)` - Track usage, returns remaining count
+- `mark_invalid(session_id)` - Mark session as expired
+
+### Bot Protocol
+Interface for AI assistant automation.
+- `initialize(session_info)` - Load session and authenticate
+- `evaluate(prompt)` - Send prompt, get response with citations
+- `start_new_conversation()` - Clear context for retry
+- `close()` - Release resources
+
+### ChatGPTBot
+Implementation of Bot protocol for ChatGPT web automation.
+- Uses Playwright for browser control
+- Handles authentication modals automatically
+- Extracts citations from responses
+
 ## Session Management
-
-The project includes two main scripts:
-
-1. **src/create_session.py** - Create authenticated session files
-2. **src/bot.py** - Run automation with saved sessions
 
 ### Creating Sessions
 
-Create session files for different Google accounts to avoid rate limits:
+The `scripts/create_session.py` utility creates authenticated session files:
 
 ```bash
 # Create sessions for multiple accounts
-uv run src/create_session.py --output session_account1.json
-uv run src/create_session.py --output session_account2.json
-uv run src/create_session.py --output session_account3.json
-
-# Or organize them in a directory
 mkdir sessions
-uv run src/create_session.py --output sessions/account1.json
-uv run src/create_session.py --output sessions/account2.json
-uv run src/create_session.py --output sessions/account3.json
-uv run src/create_session.py --output sessions/account4.json
+uv run scripts/create_session.py --output sessions/account1.json
+uv run scripts/create_session.py --output sessions/account2.json
+uv run scripts/create_session.py --output sessions/account3.json
 ```
 
 Each session file stores the authenticated state (cookies, storage) for reuse.
 
 ### Using Sessions
 
-The bot always uses session rotation mode - simply provide a directory with one or more session files.
-
-**For single session:** Put one file in the directory
-**For rotation:** Put multiple files in the directory
-
-The bot automatically attempts to get answers **with citations** for each prompt:
+The bot uses session rotation mode - provide a directory with session files.
 
 ```bash
 # Try up to 3 times per prompt to get citations
-# 4 sessions in ./sessions directory
 # --per-session-runs 10 means each session handles 10 attempts before switching
 
 uv run src/bot.py --sessions-dir ./sessions --input prompts.csv --max-attempts 3 --per-session-runs 10
@@ -86,20 +112,22 @@ uv run src/bot.py --sessions-dir ./sessions --input prompts.csv --max-attempts 3
 - Sessions rotate automatically after `--per-session-runs` attempts
 
 **Key Parameters:**
-- `--sessions-dir PATH` - Directory containing session .json files
+- `--sessions-dir PATH` - Directory containing session .json files (required)
 - `--max-attempts N` - Maximum attempts to get citations per prompt (default: 1)
 - `--per-session-runs N` - Number of attempts per session before switching (default: 10)
+- `-i, --input` - Input CSV file with prompts (default: prompts.csv)
+- `-o, --output` - Output JSON file (default: chatgpt_results.json)
 
 ### Benefits
 
-- ✅ **Avoid rate limits** - Distribute load across multiple Google accounts
-- ✅ **Automatic rotation** - Script handles session switching automatically
-- ✅ **Cycle indefinitely** - Sessions are reused in round-robin fashion
-- ✅ **No manual intervention** - Set it and forget it
-- ✅ **Unified approach** - Single or multiple sessions use the same `--sessions-dir` parameter
+- Avoid rate limits - Distribute load across multiple accounts
+- Automatic rotation - Session switching handled automatically
+- Round-robin cycling - Sessions reused indefinitely
+- Clean separation - Session management decoupled from bot logic
 
 ## Architecture
 
-- **Automation Framework**: Playwright is the chosen framework for browser automation
+- **Automation Framework**: Playwright for browser automation
 - **Target**: ChatGPT web application (rich client interface)
-- **Core Functionality**: Send prompts to ChatGPT and extract/scrape responses
+- **Design**: SOLID principles with Protocol-based abstractions
+- **Extensibility**: Easy to add new AI providers (implement Bot protocol)

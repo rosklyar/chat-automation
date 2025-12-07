@@ -1,1379 +1,26 @@
+"""
+Main orchestration module for ChatGPT automation.
+
+This module coordinates:
+- Session provider for managing authentication sessions
+- Bot instances for AI evaluation
+- Retry logic for obtaining citations
+- Input/output operations
+"""
+
 import argparse
-import csv
-import os
-from datetime import datetime
 
 from playwright.sync_api import sync_playwright
 
-
-def handle_login_modal(page):
-    """
-    Handle the ChatGPT login modal by clicking "Stay logged out".
-
-    Args:
-        page: Playwright page object
-
-    Returns:
-        True if modal was handled, False if not present
-    """
-    try:
-        # Wait for the "Stay logged out" button/link to appear
-        stay_logged_out = page.get_by_text("Stay logged out")
-
-        # Check if it's visible within 5 seconds
-        if stay_logged_out.is_visible(timeout=5000):
-            print("Login modal detected, clicking 'Stay logged out'...")
-            stay_logged_out.click()
-            page.wait_for_timeout(2000)  # Wait for modal to close
-            print("✓ Stayed logged out")
-            return True
-    except Exception as e:
-        # Modal not present or already dismissed - this is fine
-        pass
-
-    return False
-
-
-def authenticate_if_needed(page, max_attempts=2) -> bool:
-    """
-    Handle authentication after loading ChatGPT with session.
-
-    Algorithm:
-    1. Wait 5 seconds for login modal to appear
-    2. If modal appears → handle it (3 types supported)
-    3. If no modal → check for "Log in" button in upper right
-    4. If "Log in" button absent → user is logged in
-    5. If "Log in" button present → click it and retry (step 1)
-
-    Args:
-        page: Playwright page object
-        max_attempts: Maximum number of login attempts (default: 2)
-
-    Returns:
-        True if authenticated successfully, False otherwise
-    """
-
-    for attempt in range(1, max_attempts + 1):
-        print(f"Authentication attempt {attempt}/{max_attempts}")
-
-        # STEP 1: Wait 5 seconds for any login modal to appear
-        print("Waiting 5 seconds for login modal...")
-        page.wait_for_timeout(5000)
-
-        modal_detected = False
-        modal_type = None
-
-        # Check for 3 types of modals
-        # Type 1: "Welcome back" with account selection
-        try:
-            welcome = page.locator('text="Welcome back"')
-            if welcome.is_visible(timeout=1000):
-                modal_detected = True
-                modal_type = "welcome_back"
-                print("✓ 'Welcome back' modal detected")
-        except:
-            pass
-
-        # Type 2 & 3: "Log in or sign up" modal
-        if not modal_detected:
-            try:
-                login_modal = page.locator('text="Log in or sign up"')
-                if login_modal.is_visible(timeout=1000):
-                    modal_detected = True
-                    modal_type = "log_in_sign_up"
-                    print("✓ 'Log in or sign up' modal detected")
-            except:
-                pass
-
-        # STEP 2: If modal appeared → handle it
-        if modal_detected:
-            if not handle_auth_modal(page, modal_type):
-                print("✗ Failed to handle authentication modal")
-                return False
-
-            # Wait for authentication to complete
-            print("Waiting for authentication to complete...")
-            page.wait_for_timeout(5000)
-
-            # Verify chat interface is ready
-            try:
-                textarea = page.locator("#prompt-textarea")
-                if textarea.is_visible(timeout=10000):
-                    print("✓ Authenticated successfully - chat interface ready")
-                    return True
-            except:
-                print("⚠ Chat interface not ready after authentication")
-                return False
-
-        # STEP 3: No modal appeared → check for "Log in" button
-        print("No modal appeared - checking for 'Log in' button...")
-
-        login_button = None
-
-        # Look for "Log in" button in upper right corner
-        try:
-            # Try multiple selectors
-            selectors = [
-                'button:has-text("Log in")',
-                'a:has-text("Log in")',
-                'header button:has-text("Log in")',
-                '[role="button"]:has-text("Log in")'
-            ]
-
-            for selector in selectors:
-                try:
-                    btn = page.locator(selector).first
-                    if btn.is_visible(timeout=1000):
-                        login_button = btn
-                        break
-                except:
-                    continue
-        except:
-            pass
-
-        # STEP 4: If "Log in" button absent → user is logged in
-        if not login_button:
-            print("No 'Log in' button found - verifying authentication...")
-
-            # Verify by checking chat interface
-            try:
-                textarea = page.locator("#prompt-textarea")
-                if textarea.is_visible(timeout=5000):
-                    print("✓ Already authenticated - chat interface ready")
-                    return True
-                else:
-                    print("✗ Neither modal nor chat interface found")
-                    return False
-            except:
-                print("✗ Authentication verification failed")
-                return False
-
-        # STEP 5: "Log in" button present → click it and retry
-        print("Found 'Log in' button - clicking to trigger modal...")
-
-        try:
-            login_button.click(timeout=5000)
-            print("Clicked 'Log in' button - will retry modal detection")
-            # Loop will continue to step 1 (wait 5 seconds for modal)
-        except Exception as e:
-            print(f"✗ Failed to click 'Log in' button: {e}")
-            return False
-
-    # Max attempts exceeded
-    print("✗ Authentication failed after maximum attempts")
-    return False
-
-
-def handle_auth_modal(page, modal_type: str) -> bool:
-    """
-    Handle the detected authentication modal.
-
-    Supports 3 modal types:
-    1. "Welcome back" with account selection (email button)
-    2. "Welcome back" with "Continue with Google"
-    3. "Log in or sign up" with "Continue with Google"
-
-    Args:
-        page: Playwright page object
-        modal_type: Type of modal detected
-
-    Returns:
-        True if modal handled successfully, False otherwise
-    """
-
-    # Wait for modal to fully render
-    page.wait_for_timeout(1500)
-
-    auth_button = None
-
-    # Strategy 1: Look for account button (email pattern)
-    # This handles "Welcome back" with saved account
-    if modal_type == "welcome_back":
-        try:
-            import re
-            email_pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
-
-            # Look for button with email
-            all_clickable = page.locator('[role="button"]').all()
-            for elem in all_clickable:
-                try:
-                    if not elem.is_visible():
-                        continue
-
-                    elem_text = elem.inner_text(timeout=500).strip()
-                    elem_html = elem.inner_html(timeout=500)
-
-                    # Check if contains email
-                    has_email = re.search(email_pattern, elem_text) or re.search(email_pattern, elem_html)
-
-                    # Filter out close buttons
-                    aria_label = elem.get_attribute("aria-label") or ""
-                    is_remove = any(word in aria_label.lower() for word in ["remove", "close", "delete"])
-
-                    if has_email and not is_remove:
-                        bbox = elem.bounding_box()
-                        if bbox and bbox['width'] > 100:
-                            print(f"Found account button: {elem_text[:50]}")
-                            auth_button = elem
-                            break
-                except:
-                    continue
-        except:
-            pass
-
-    # Strategy 2: Look for "Continue with Google" button
-    if not auth_button:
-        try:
-            google_selectors = [
-                'button:has-text("Continue with Google")',
-                'button:text("Continue with Google")',
-                '[role="button"]:has-text("Continue with Google")'
-            ]
-
-            for selector in google_selectors:
-                try:
-                    btn = page.locator(selector).first
-                    if btn.is_visible(timeout=2000):
-                        print("Found 'Continue with Google' button")
-                        auth_button = btn
-                        break
-                except:
-                    continue
-        except:
-            pass
-
-    # Click button if found
-    if not auth_button:
-        print("✗ Could not find authentication button in modal")
-        page.screenshot(path="auth_modal_button_not_found.png")
-        return False
-
-    try:
-        # Click the button
-        auth_button.click(timeout=5000)
-        print("Clicked authentication button")
-
-        # Wait for modal to dismiss
-        page.wait_for_timeout(3000)
-
-        # Verify modal disappeared
-        try:
-            welcome = page.locator('text="Welcome back"')
-            if not welcome.is_visible(timeout=1000):
-                print("Modal dismissed")
-        except:
-            pass
-
-        return True
-
-    except Exception as e:
-        print(f"✗ Failed to click authentication button: {e}")
-        page.screenshot(path="auth_modal_click_failed.png")
-        return False
-
-
-def save_session(context, session_file: str):
-    """
-    Save browser context state (cookies, storage) to file.
-
-    Args:
-        context: Playwright browser context
-        session_file: Path to save session data
-
-    Returns:
-        True if successful, False otherwise
-    """
-    try:
-        context.storage_state(path=session_file)
-        print(f"✓ Session saved to {session_file}")
-        return True
-    except Exception as e:
-        print(f"✗ Failed to save session: {e}")
-        return False
-
-
-def load_session(context, session_file: str):
-    """
-    Load browser context state from file.
-
-    Args:
-        context: Playwright browser context (not used, for API consistency)
-        session_file: Path to session file
-
-    Returns:
-        True if file exists and is readable, False otherwise
-    """
-    try:
-        if os.path.exists(session_file):
-            print(f"✓ Found session file: {session_file}")
-            return True
-        else:
-            print(f"⚠ No session file found at {session_file}")
-            return False
-    except Exception as e:
-        print(f"✗ Error checking session file: {e}")
-        return False
-
-
-def is_logged_in(page) -> bool:
-    """
-    Check if user is logged in to ChatGPT by verifying chat interface presence.
-
-    Args:
-        page: Playwright page object
-
-    Returns:
-        True if logged in, False otherwise
-    """
-    try:
-        # Navigate to ChatGPT
-        page.goto("https://chatgpt.com/", timeout=60000)
-        page.wait_for_load_state("domcontentloaded")
-
-        # Authenticate if needed using new unified function
-        return authenticate_if_needed(page)
-    except Exception as e:
-        print(f"⚠ Session validation failed: {e}")
-        return False
-
-
-def read_prompts_from_csv(csv_path: str) -> list[dict]:
-    """
-    Read prompts from CSV file.
-
-    Args:
-        csv_path: Path to CSV file with columns: id, prompt
-
-    Returns:
-        List of dictionaries with 'id' and 'prompt' keys
-    """
-    prompts = []
-
-    try:
-        with open(csv_path, 'r', encoding='utf-8') as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                prompts.append({
-                    'id': row['id'],
-                    'prompt': row['prompt']
-                })
-        print(f"✓ Loaded {len(prompts)} prompts from {csv_path}")
-        return prompts
-    except FileNotFoundError:
-        print(f"✗ Error: File {csv_path} not found")
-        return []
-    except Exception as e:
-        print(f"✗ Error reading CSV: {e}")
-        return []
-
-
-def chatgpt_automation(prompt: str, prompt_id: str, run_number: int, output_file: str, page=None, browser_context=None):
-    """
-    Automates ChatGPT interaction:
-    1. Opens chatgpt.com in Chromium or uses existing page
-    2. Sends a prompt
-    3. Scrapes the response
-    4. Saves to JSON
-
-    Args:
-        prompt: The prompt text to send
-        prompt_id: ID of the prompt from CSV
-        run_number: Current run number
-        output_file: Path to output JSON file
-        page: Existing Playwright page object (optional)
-        browser_context: Tuple of (browser, context) for reuse (optional)
-
-    Returns:
-        Tuple of (browser, context, page) for potential reuse
-    """
-    own_browser = False
-
-    # If no browser context provided, create new one
-    if browser_context is None:
-        own_browser = True
-        p = sync_playwright().start()
-        print("Launching browser...")
-
-        # Launch with args to avoid bot detection
-        launch_args = [
-            '--disable-blink-features=AutomationControlled',  # Hide automation
-            '--disable-dev-shm-usage',
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-        ]
-
-        browser = p.chromium.launch(
-            headless=False,
-            args=launch_args
-        )
-        context = browser.new_context(
-            viewport={'width': 1280, 'height': 720},
-            user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        )
-    else:
-        browser, context = browser_context
-
-    # Create new page for fresh conversation
-    if page is None:
-        page = context.new_page()
-
-        # Remove webdriver flag
-        page.add_init_script("""
-            Object.defineProperty(navigator, 'webdriver', {
-                get: () => undefined
-            });
-        """)
-
-    print("Navigating to ChatGPT...")
-    try:
-        page.goto("https://chatgpt.com/", timeout=60000)
-    except Exception as e:
-        print(f"✗ Failed to navigate: {e}")
-        if own_browser:
-            browser.close()
-        return None
-
-    # Wait for page to load
-    try:
-        page.wait_for_load_state("domcontentloaded")
-        print(f"✓ Page loaded. Current URL: {page.url}")
-    except Exception as e:
-        print(f"Warning: Page load state error: {e}")
-
-    # Debug: Check if page is still open
-    if page.is_closed():
-        print("✗ Page was closed unexpectedly")
-        if own_browser:
-            browser.close()
-        return None
-
-    # Handle login modal if it appears
-    handle_login_modal(page)
-
-    # Authenticate if needed using new unified function
-    if not authenticate_if_needed(page):
-        print("✗ Authentication failed")
-        if own_browser:
-            browser.close()
-        return None
-
-    # Locate the prompt input textarea
-    textarea = page.locator("#prompt-textarea")
-
-    print(f"Entering prompt: {prompt}")
-    textarea.fill(prompt)
-    textarea.press("Enter")
-
-    print("Waiting for response...")
-    page.wait_for_timeout(2000)
-
-    # Wait for generation to complete by checking for stop button disappearance
-    try:
-        stop_button = page.locator('button[aria-label*="Stop"]')
-        if stop_button.count() > 0:
-            stop_button.wait_for(state="hidden", timeout=60000)
-    except:
-        pass
-
-    page.wait_for_timeout(2000)  # Extra wait to ensure content is rendered
-
-    response_text = None
-
-    # Try different selectors for ChatGPT response
-    selectors = [
-        '[data-message-author-role="assistant"] .markdown',
-        '[data-message-author-role="assistant"]',
-        'article[data-testid*="conversation-turn"] .markdown',
-        'article[data-testid*="conversation-turn"]',
-        '.markdown',
-        '[class*="agent-turn"]',
-        'div[class*="markdown"]',
-    ]
-
-    for selector in selectors:
-        try:
-            messages = page.locator(selector).all()
-            if messages and len(messages) > 0:
-                response_text = messages[-1].inner_text()
-                if response_text and len(response_text) > 50:
-                    print(f"✓ Response found ({len(response_text)} chars)")
-                    break
-        except:
-            continue
-
-    # Fallback: Get all text from page and extract response
-    if not response_text:
-        try:
-            full_text = page.locator("body").inner_text()
-
-            # Try to extract response after our prompt
-            lines = full_text.split("\n")
-            prompt_found = False
-            response_lines = []
-
-            for i, line in enumerate(lines):
-                if prompt in line and not prompt_found:
-                    prompt_found = True
-                    continue
-                if prompt_found and line.strip():
-                    # Collect lines until we hit UI elements or next prompt
-                    if any(x in line.lower() for x in ["regenerate", "copy code", "chatgpt can make"]):
-                        break
-                    response_lines.append(line.strip())
-                    if len(response_lines) > 50:  # Reasonable limit
-                        break
-
-            if response_lines:
-                response_text = "\n".join(response_lines)
-                print(f"✓ Response extracted ({len(response_text)} chars)")
-        except:
-            pass
-
-    if not response_text:
-        response_text = "No response found"
-        print("⚠ Warning: Could not find response")
-
-    # Extract sources if present
-    sources = extract_sources(page)
-
-    # Return browser context, sources, and response text for citation checking and saving
-    return (browser, context, page, sources, response_text)
-
-
-def extract_sources(page):
-    """
-    Extract cited sources from ChatGPT response by clicking the "Джерела"/"Sources" button.
-
-    Args:
-        page: Playwright page object
-
-    Returns:
-        List of source dictionaries with 'number', 'name', 'title', 'url' keys
-    """
-    sources = []
-
-    try:
-        print("\nExtracting sources...")
-
-        # Step 1: Find the sources button (try both Ukrainian "Джерела" and English "Sources")
-        sources_button = None
-
-        # Try Ukrainian "Джерела"
-        try:
-            sources_button = page.get_by_role("button", name="Джерела")
-            if sources_button.count() == 0:
-                sources_button = None
-            else:
-                print("  Found sources button: 'Джерела' (Ukrainian)")
-        except:
-            pass
-
-        # Try English "Sources"
-        if not sources_button:
-            try:
-                sources_button = page.get_by_role("button", name="Sources")
-                if sources_button.count() == 0:
-                    sources_button = None
-                else:
-                    print("  Found sources button: 'Sources' (English)")
-            except:
-                pass
-
-        # Additional fallback: text-based search
-        if not sources_button:
-            try:
-                sources_button = page.locator('button:has-text("Джерела"), button:has-text("Sources")').last
-                if sources_button.count() > 0:
-                    print("  Found sources button using text search")
-                else:
-                    sources_button = None
-            except:
-                pass
-
-        if not sources_button or sources_button.count() == 0:
-            print("  No sources button found - response may not have cited sources")
-            return sources
-
-        # Step 2: Count asides BEFORE clicking (to detect new panel)
-        asides_before_count = page.locator('aside').count()
-        print(f"  Asides before click: {asides_before_count}")
-
-        # Step 3: Click the sources button to open sidebar
-        print("  Clicking sources button to open sidebar...")
-        sources_button.click()
-        page.wait_for_timeout(3000)  # Wait longer for panel to fully render (increased to 3 seconds)
-
-        # Search for citations container using STRUCTURAL markers
-        print("  Searching for citations container by structure...")
-        try:
-            citations_container = None
-
-            # Strategy 1: Find by specific CSS classes that ChatGPT uses for citations panel
-            print("    Strategy 1: Looking for citations panel by CSS classes...")
-            try:
-                # The citations container has these specific classes
-                potential_containers = page.locator('div.bg-token-bg-primary.flex.w-full.flex-col').all()
-                for container in potential_containers:
-                    text = container.inner_text()
-                    # Check if it has citation header text
-                    if "Цитати" in text or "Citations" in text or "Джерела" in text or "Цитування" in text:
-                        # Verify it has multiple links
-                        links_count = container.locator('a[target="_blank"][href^="http"]').count()
-                        if links_count >= 2:
-                            citations_container = container
-                            print(f"    ✓ Found citations container by CSS classes ({links_count} links)")
-                            break
-            except Exception as e:
-                print(f"    Strategy 1 failed: {e}")
-
-            # Strategy 2: Find container with citation header AND multiple external links
-            if not citations_container:
-                print("    Strategy 2: Looking for container with citation header + links...")
-                try:
-                    all_divs = page.locator('div').all()
-                    for idx, div in enumerate(all_divs):
-                        try:
-                            text = div.inner_text()
-                            # Check if it has citation section header
-                            has_citation_header = ("Цитати" in text or "Citations" in text or
-                                                  "Джерела" in text or "Цитування" in text)
-
-                            if has_citation_header:
-                                # Count external links with target="_blank"
-                                links_count = div.locator('a[target="_blank"][href^="http"]').count()
-                                if links_count >= 2:
-                                    citations_container = div
-                                    print(f"    ✓ Found citations container by structure ({links_count} links)")
-                                    break
-                        except:
-                            continue
-                except Exception as e:
-                    print(f"    Strategy 2 failed: {e}")
-
-            # Strategy 3: Find by UL element with specific classes
-            if not citations_container:
-                print("    Strategy 3: Looking for <ul> with citation structure...")
-                try:
-                    ul_elements = page.locator('ul.flex.flex-col').all()
-                    for ul in ul_elements:
-                        links_count = ul.locator('a[href^="http"][target="_blank"]').count()
-                        if links_count >= 2:
-                            # Get parent container (go up 2 levels)
-                            citations_container = ul.locator('xpath=../..').first
-                            print(f"    ✓ Found citations container by <ul> structure ({links_count} links)")
-                            break
-                except Exception as e:
-                    print(f"    Strategy 3 failed: {e}")
-
-            if citations_container:
-                print(f"  ✓ FOUND CITATIONS CONTAINER using structural markers!")
-                panel = citations_container
-                print(f"  ✓ Panel variable set to found citations container")
-            else:
-                print("  ✗ No citations container found using structural markers")
-
-        except Exception as e:
-            print(f"  Error searching for citations container: {e}")
-
-        # Step 4: Find Citations panel (skip if brute-force already found it)
-        if not panel:
-            # Only run aside detection if brute-force didn't find citations
-            try:
-                page.wait_for_function(
-                    f'document.querySelectorAll("aside").length > {asides_before_count}',
-                    timeout=5000
-                )
-                print("  ✓ New aside appeared after clicking")
-            except:
-                print("  ⚠ No new aside detected, will search existing ones")
-
-            # Step 5: Find the CORRECT Citations panel (not the left navigation sidebar)
-            asides = page.locator('aside').all()
-            print(f"  Total asides now: {len(asides)}")
-
-            panel = None
-            for idx, aside in enumerate(asides):
-                try:
-                    # Get position to check if it's on the right side of screen
-                    box = aside.bounding_box()
-                    text = aside.inner_text()
-
-                    # Skip if it's the left navigation sidebar
-                    if "New chat" in text or "Library" in text:
-                        print(f"  Skipping aside #{idx+1}: Left navigation sidebar")
-                        continue
-
-                    # Check for navigation-specific elements in HTML
-                    try:
-                        html = aside.inner_html()
-                        if "create-new-chat-button" in html or "sidebar-item-library" in html:
-                            print(f"  Skipping aside #{idx+1}: Navigation sidebar (by HTML)")
-                            continue
-                    except:
-                        pass
-
-                    # Check if this aside is on the right side of screen
-                    if box:
-                        print(f"  Checking aside #{idx+1} at position x={box['x']}, y={box['y']}")
-
-                        # Citations panel should be on the right (x > 600 typically)
-                        if box['x'] > 600:
-                            # Verify it has citation-like content
-                            if len(text) > 50:
-                                print(f"    Text length: {len(text)} chars")
-                                print(f"    Text preview: {text[:100]}...")
-
-                                # Check for citation indicators
-                                has_citations = (
-                                    "Citations" in text or
-                                    "Цитування" in text or
-                                    "http" in text or
-                                    len(text) > 100  # Citations panel has substantial content
-                                )
-
-                                if has_citations:
-                                    panel = aside
-                                    print(f"  ✓ Found Citations panel (aside #{idx+1}) at x={box['x']}")
-                                    break
-                                else:
-                                    print(f"    Doesn't look like Citations panel")
-                        else:
-                            print(f"    Too far left (x={box['x']}), skipping")
-
-                except Exception as e:
-                    print(f"  Error checking aside #{idx+1}: {e}")
-                    continue
-
-            # Fallback: if no panel found, try the last aside (newest)
-            if not panel and len(asides) > 0:
-                print("  Trying fallback: using last aside")
-                panel = asides[-1]
-                try:
-                    text_check = panel.inner_text()
-                    if "New chat" not in text_check:
-                        print("  ✓ Fallback succeeded (last aside is not navigation)")
-                    else:
-                        panel = None
-                        print("  ✗ Fallback failed (last aside is still navigation)")
-                except:
-                    pass
-        else:
-            print("  ✓ Using citations container from brute-force search")
-
-        if not panel:
-            print("  ✗ Could not find Citations panel after clicking button")
-            # Try to close anything that might have opened
-            try:
-                page.keyboard.press("Escape")
-            except:
-                pass
-            return sources
-
-        # Wait for panel content to load
-        try:
-            print("  Waiting for panel content to load...")
-            # Try to wait for at least one link to appear
-            panel.locator('a').first.wait_for(state="visible", timeout=5000)
-            print("  ✓ Panel content loaded")
-        except Exception as e:
-            print(f"  Warning: Could not detect links loading: {e}")
-            # Give it extra time anyway
-            page.wait_for_timeout(2000)
-
-        # Step 4: Verify panel content and add comprehensive debugging
-        print("  Verifying panel content...")
-
-        # Get panel text for verification
-        panel_text = ""
-        try:
-            panel_text = panel.inner_text()
-            print(f"  Panel text length: {len(panel_text)} chars")
-            if len(panel_text) > 0:
-                print(f"  Panel text preview: {panel_text[:200]}...")
-        except Exception as e:
-            print(f"  Could not get panel text: {e}")
-
-        # Verify we have the Citations panel
-        if panel_text and len(panel_text) > 50:
-            if "Citations" in panel_text or "Цитування" in panel_text or "Джерела" in panel_text:
-                print("  ✓ Confirmed this is the Citations panel")
-            else:
-                print("  ⚠ Warning: Panel may not be Citations panel")
-                # Try to find actual Citations panel
-                try:
-                    citations_panel = page.locator('aside:has-text("Citations"), aside:has-text("Цитування")').first
-                    if citations_panel.count() > 0 and citations_panel.is_visible():
-                        panel = citations_panel
-                        panel_text = panel.inner_text()
-                        print("  ✓ Found correct Citations panel")
-                except:
-                    pass
-        else:
-            print("  ⚠ Warning: Panel text is empty or very short")
-
-        print("  Extracting sources from panel...")
-
-        # Try multiple selector strategies
-        source_links = []
-
-        # Strategy 0: Direct extraction from known ul > li > a structure
-        if panel:
-            try:
-                citation_links = panel.locator('ul > li > a[href^="http"]').all()
-
-                # If primary fails, try alternatives
-                if len(citation_links) == 0:
-                    citation_links = panel.locator('a[target="_blank"]').all()
-
-                if len(citation_links) == 0:
-                    citation_links = panel.locator('a[href*="utm_source=chatgpt"]').all()
-
-                if len(citation_links) == 0:
-                    citation_links = panel.locator('ul a[href^="http"]').all()
-
-                if len(citation_links) > 0:
-                    print(f"    ✓ Found {len(citation_links)} citation links in ul > li > a structure")
-
-                    for idx, link in enumerate(citation_links, 1):
-                        try:
-                            url = link.get_attribute('href') or ""
-
-                            # Get all divs - they contain name, title, description
-                            divs = link.locator('div').all()
-                            text_parts = []
-
-                            for div in divs:
-                                try:
-                                    text = div.inner_text().strip()
-                                    # Skip empty text and favicon URLs
-                                    if text and not text.startswith('http') and len(text) > 1:
-                                        text_parts.append(text)
-                                except:
-                                    continue
-
-                            # Extract components
-                            # First div typically has store name
-                            # Second div has title
-                            # Third div has description
-                            name = text_parts[0] if len(text_parts) > 0 else f"Source {idx}"
-                            title = text_parts[1] if len(text_parts) > 1 else ""
-                            description = text_parts[2] if len(text_parts) > 2 else ""
-
-                            sources.append({
-                                'number': idx,
-                                'name': name,
-                                'title': title,
-                                'description': description,
-                                'url': url
-                            })
-
-                            print(f"      ✓ [{idx}] {name} - {url}")
-
-                        except Exception as e:
-                            print(f"      ✗ Error extracting citation {idx}: {e}")
-
-                    # If we got sources, skip other strategies
-                    if len(sources) > 0:
-                        print(f"  ✓ Strategy 0 succeeded! Extracted {len(sources)} sources")
-                        source_links = []  # Clear to skip other strategies
-                else:
-                    print("    No citation links found with ul > li > a structure")
-
-            except Exception as e:
-                print(f"  Strategy 0 error: {e}")
-
-        # Strategy 1: Try href starting with http
-        try:
-            source_links = panel.locator('a[href^="http"]').all()
-            print(f"  Strategy 1 (a[href^='http']): found {len(source_links)} links")
-        except Exception as e:
-            print(f"  Strategy 1 error: {e}")
-
-        # Strategy 2: Try any href
-        if len(source_links) == 0:
-            try:
-                source_links = panel.locator('a[href]').all()
-                print(f"  Strategy 2 (a[href]): found {len(source_links)} links")
-            except Exception as e:
-                print(f"  Strategy 2 error: {e}")
-
-        # Strategy 3: Try all links
-        if len(source_links) == 0:
-            try:
-                source_links = panel.locator('a').all()
-                print(f"  Strategy 3 (all <a> tags): found {len(source_links)} links")
-            except Exception as e:
-                print(f"  Strategy 3 error: {e}")
-
-        # Strategy 4: Look in list items
-        if len(source_links) == 0:
-            try:
-                source_links = panel.locator('li a, [role="listitem"] a').all()
-                print(f"  Strategy 4 (list item links): found {len(source_links)} links")
-            except Exception as e:
-                print(f"  Strategy 4 error: {e}")
-
-        # Strategy 5: Look for any clickable/link-like elements
-        if len(source_links) == 0:
-            try:
-                source_links = panel.locator('[href], [role="link"]').all()
-                print(f"  Strategy 5 (href or role=link): found {len(source_links)} links")
-            except Exception as e:
-                print(f"  Strategy 5 error: {e}")
-
-        # Strategy 6: Look for citation-specific structures
-        if len(source_links) == 0:
-            try:
-                source_links = panel.locator('[data-testid*="citation"], [class*="citation"]').all()
-                print(f"  Strategy 6 (citation elements): found {len(source_links)} links")
-            except Exception as e:
-                print(f"  Strategy 6 error: {e}")
-
-        # Strategy 7: Try finding divs with links inside
-        if len(source_links) == 0:
-            try:
-                # Find parent containers that might hold citation info
-                citation_containers = panel.locator('div[class] > a').all()
-                if len(citation_containers) > 0:
-                    source_links = citation_containers
-                    print(f"  Strategy 7 (div > a): found {len(source_links)} links")
-            except Exception as e:
-                print(f"  Strategy 7 error: {e}")
-
-        # Strategy 8: Get ALL clickable elements and filter later
-        if len(source_links) == 0:
-            try:
-                all_clickable = panel.locator('a, button, [onclick], [role="button"]').all()
-                # Filter for ones that look like citations (have meaningful text)
-                source_links = [el for el in all_clickable if len(el.inner_text().strip()) > 3]
-                print(f"  Strategy 8 (all clickable, filtered): found {len(source_links)} elements")
-            except Exception as e:
-                print(f"  Strategy 8 error: {e}")
-
-        # Strategy 9: Manual text parsing as last resort
-        if len(source_links) == 0:
-            print("  Strategy 9: Attempting manual text parsing")
-            try:
-                import re
-                panel_full_text = panel.inner_text()
-
-                # Look for URL patterns in text
-                urls = re.findall(r'https?://[^\s\)]+', panel_full_text)
-                print(f"  Found {len(urls)} URLs in panel text via regex")
-
-                # Parse structured citation entries
-                # Citations panel typically has format:
-                # [Icon] Name
-                # Title/Description text
-                # URL
-
-                lines = panel_full_text.split('\n')
-                current_citation = {}
-                citations_parsed = []
-
-                for i, line in enumerate(lines):
-                    line = line.strip()
-                    if not line:
-                        # Empty line might separate citations
-                        if current_citation and 'name' in current_citation:
-                            citations_parsed.append(current_citation)
-                            current_citation = {}
-                        continue
-
-                    # Check if line contains a URL
-                    if 'http' in line:
-                        url_match = re.search(r'https?://[^\s\)]+', line)
-                        if url_match:
-                            if 'url' not in current_citation:
-                                current_citation['url'] = url_match.group()
-                            # Line might also contain description
-                            text_without_url = line.replace(url_match.group(), '').strip()
-                            if text_without_url:
-                                if 'description' not in current_citation:
-                                    current_citation['description'] = text_without_url
-                                else:
-                                    current_citation['description'] += ' ' + text_without_url
-                    else:
-                        # Line doesn't contain URL
-                        # Short lines are likely names (Allo, comfy.ua, Citrus, etc.)
-                        if len(line) < 50 and 'name' not in current_citation:
-                            current_citation['name'] = line
-                        else:
-                            # Longer lines are descriptions
-                            if 'description' not in current_citation:
-                                current_citation['description'] = line
-                            else:
-                                current_citation['description'] += ' ' + line
-
-                # Add last citation if exists
-                if current_citation and 'name' in current_citation:
-                    citations_parsed.append(current_citation)
-
-                print(f"  Parsed {len(citations_parsed)} structured citations from text")
-
-                # Create source entries from parsed citations
-                for idx, citation in enumerate(citations_parsed, 1):
-                    name = citation.get('name', f'Source {idx}')
-                    description = citation.get('description', '')
-                    url = citation.get('url', '')
-
-                    sources.append({
-                        'number': idx,
-                        'name': name,
-                        'title': description[:200] if description else name,  # Limit title length
-                        'url': url if url else 'No URL found'
-                    })
-                    print(f"    ✓ [{idx}] {name} - {url if url else 'No URL'}")
-
-                # Fallback: if structured parsing didn't work, use URL-based extraction
-                if len(sources) == 0 and len(urls) > 0:
-                    print("  Falling back to URL-based extraction...")
-                    for idx, url in enumerate(urls, 1):
-                        # Try to extract name from text near URL
-                        name = f"Source {idx}"
-
-                        url_pos = panel_full_text.find(url)
-                        if url_pos > 0:
-                            text_before = panel_full_text[max(0, url_pos-150):url_pos].strip()
-                            text_lines = text_before.split('\n')
-                            if text_lines:
-                                potential_name = text_lines[-1].strip()
-                                if potential_name and len(potential_name) < 100:
-                                    name = potential_name
-
-                        sources.append({
-                            'number': idx,
-                            'name': name,
-                            'title': name,
-                            'url': url
-                        })
-                        print(f"    ✓ [{idx}] {name} - {url}")
-
-                # If we found sources via text parsing, skip link processing
-                if len(sources) > 0:
-                    source_links = []
-
-            except Exception as e:
-                print(f"  Manual parsing failed: {e}")
-
-        # Process found links (if any)
-        if len(source_links) > 0:
-            print(f"  Processing {len(source_links)} links...")
-            for idx, link in enumerate(source_links, 1):
-                try:
-                    url = link.get_attribute('href') or ""
-
-                    # Handle relative URLs
-                    if url and not url.startswith('http'):
-                        if url.startswith('/'):
-                            url = f"https://chatgpt.com{url}"
-
-                    text = link.inner_text().strip()
-
-                    # Extract name (usually first line)
-                    lines = text.split('\n')
-                    name = lines[0] if lines else text[:100]
-
-                    # Clean up name if it's too long
-                    if len(name) > 100:
-                        name = name[:97] + "..."
-
-                    source_data = {
-                        'number': idx,
-                        'name': name,
-                        'title': text,
-                        'url': url
-                    }
-
-                    sources.append(source_data)
-                    print(f"    ✓ [{idx}] {name} - {url}")
-
-                except Exception as e:
-                    print(f"    ✗ Error extracting source {idx}: {e}")
-                    continue
-
-        # Step 5: Close the panel
-        try:
-            page.keyboard.press("Escape")
-            page.wait_for_timeout(500)
-            print("  Panel closed")
-        except:
-            pass
-
-        if sources:
-            print(f"  ✓ Successfully extracted {len(sources)} sources")
-        else:
-            print("  ⚠ No sources were extracted from panel")
-
-    except Exception as e:
-        print(f"  ✗ Error during source extraction: {e}")
-        # Make sure to close any open panels
-        try:
-            page.keyboard.press("Escape")
-        except:
-            pass
-
-    return sources
-
-
-def start_new_conversation(page):
-    """
-    Start a new conversation by navigating to fresh ChatGPT page.
-
-    Args:
-        page: Playwright page object
-
-    Returns:
-        True if successful, False otherwise
-    """
-    print("\nStarting new conversation...")
-    try:
-        # Navigate to base URL to start fresh conversation
-        page.goto("https://chatgpt.com/", timeout=60000)
-        page.wait_for_load_state("domcontentloaded")
-
-        # Handle login modal if it appears
-        handle_login_modal(page)
-
-        # Handle "Welcome back" modal if it appears
-        handle_welcome_back_modal(page)
-
-        # Wait for textarea to be ready
-        textarea = page.locator("#prompt-textarea")
-        textarea.wait_for(timeout=30000)
-
-        print("✓ New conversation ready")
-        return True
-    except Exception as e:
-        print(f"✗ Failed to start new conversation: {e}")
-        return False
-
-
-def has_citations(sources: list) -> bool:
-    """
-    Check if sources list contains valid citations.
-
-    Args:
-        sources: List of source dictionaries
-
-    Returns:
-        True if sources list is not empty and has valid entries, False otherwise
-    """
-    return sources is not None and len(sources) > 0
-
-
-def save_empty_response(prompt_id: str, prompt_text: str, output_file: str):
-    """
-    Save a prompt entry with empty answers array when all attempts to get citations failed.
-
-    Args:
-        prompt_id: ID of the prompt
-        prompt_text: The prompt text
-        output_file: Path to output JSON file
-    """
-    import json
-    from datetime import datetime
-
-    print("⚠ Saving prompt with empty answers - no citations found after all attempts")
-
-    # Load existing data
-    try:
-        with open(output_file, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-    except FileNotFoundError:
-        data = []
-
-    # Find or create prompt entry
-    prompt_entry = None
-    for entry in data:
-        if entry.get("prompt_id") == prompt_id:
-            prompt_entry = entry
-            break
-
-    if not prompt_entry:
-        # Create new entry with empty answers array
-        prompt_entry = {
-            "prompt_id": prompt_id,
-            "prompt": prompt_text,
-            "answers": []
-        }
-        data.append(prompt_entry)
-
-    # Save back to file
-    with open(output_file, 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
-
-
-def save_to_json(prompt_id: str, prompt_text: str, run_number: int, response_text: str, sources: list, output_file: str):
-    """Save prompt and response to JSON file with nested structure.
-
-    Structure: [{"prompt_id": "1", "prompt": "...", "answers": [{"run_number": 1, "response": "...", "citations": [{"url": "", "text": ""}], "timestamp": "..."}]}]
-    """
-    import json
-
-    timestamp = datetime.now().isoformat()
-
-    # Load existing data
-    data = []
-    if os.path.exists(output_file):
-        try:
-            with open(output_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-        except (json.JSONDecodeError, IOError):
-            # If file is corrupted or empty, start fresh
-            data = []
-
-    # Format citations as list of {url, text} objects
-    citations = []
-    if sources and len(sources) > 0:
-        for source in sources:
-            # Combine name, title, description into text
-            text_parts = []
-            if source.get('name'):
-                text_parts.append(source['name'])
-            if source.get('title') and source['title'] != source.get('name'):
-                text_parts.append(source['title'])
-            if source.get('description') and source['description'] != source.get('title'):
-                text_parts.append(source['description'])
-
-            citation_text = ' - '.join(text_parts) if text_parts else source.get('name', 'Unknown')
-
-            citations.append({
-                'url': source.get('url', ''),
-                'text': citation_text
-            })
-
-    # Find or create prompt entry
-    prompt_entry = None
-    for entry in data:
-        if entry.get('prompt_id') == prompt_id:
-            prompt_entry = entry
-            break
-
-    if not prompt_entry:
-        prompt_entry = {
-            'prompt_id': prompt_id,
-            'prompt': prompt_text,
-            'answers': []
-        }
-        data.append(prompt_entry)
-
-    # Append answer to prompt
-    prompt_entry['answers'].append({
-        'run_number': run_number,
-        'response': response_text,
-        'citations': citations,
-        'timestamp': timestamp
-    })
-
-    # Save back to file
-    with open(output_file, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-
-    print(f"✓ Results saved to {output_file}")
-
-
-
-def load_sessions_from_dir(sessions_dir: str) -> list[str]:
-    """
-    Load all session files from a directory.
-
-    Args:
-        sessions_dir: Path to directory containing session .json files
-
-    Returns:
-        List of absolute paths to session files, sorted alphabetically
-    """
-    import glob
-
-    if not os.path.exists(sessions_dir):
-        print(f"✗ Error: Sessions directory not found: {sessions_dir}")
-        return []
-
-    if not os.path.isdir(sessions_dir):
-        print(f"✗ Error: Path is not a directory: {sessions_dir}")
-        return []
-
-    # Find all .json files in the directory
-    pattern = os.path.join(sessions_dir, "*.json")
-    session_files = glob.glob(pattern)
-
-    if not session_files:
-        print(f"✗ Error: No .json session files found in {sessions_dir}")
-        return []
-
-    # Sort for consistent ordering
-    session_files.sort()
-
-    print(f"✓ Found {len(session_files)} session file(s) in {sessions_dir}:")
-    for idx, session_file in enumerate(session_files, 1):
-        basename = os.path.basename(session_file)
-        print(f"  {idx}. {basename}")
-
-    return session_files
-
-
-def load_and_validate_session(playwright_instance, session_file: str):
-    """
-    Load a session file and validate it by logging in.
-
-    Args:
-        playwright_instance: Active playwright instance (from sync_playwright().start())
-        session_file: Path to session file
-
-    Returns:
-        Tuple of (browser, context, page) if successful, None if failed
-    """
-    print(f"\n{'='*60}")
-    print(f"Loading session: {os.path.basename(session_file)}")
-    print(f"{'='*60}")
-
-    # Launch browser using the provided playwright instance
-    launch_args = [
-        '--disable-blink-features=AutomationControlled',
-        '--disable-dev-shm-usage',
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-    ]
-    browser = playwright_instance.chromium.launch(headless=False, args=launch_args)
-
-    # Load session into context
-    try:
-        context = browser.new_context(
-            storage_state=session_file,
-            viewport={'width': 1280, 'height': 720},
-            user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        )
-        page = context.new_page()
-
-        # Remove webdriver flag
-        page.add_init_script("""
-            Object.defineProperty(navigator, 'webdriver', {
-                get: () => undefined
-            });
-        """)
-
-        # Validate session
-        if is_logged_in(page):
-            print(f"✓ Session loaded and validated: {os.path.basename(session_file)}\n")
-            return (browser, context, page)
-        else:
-            print(f"⚠ Session expired or invalid: {os.path.basename(session_file)}")
-            page.close()
-            browser.close()
-            return None
-
-    except Exception as e:
-        print(f"✗ Failed to load session {os.path.basename(session_file)}: {e}")
-        if 'page' in locals() and page:
-            page.close()
-        if 'browser' in locals() and browser:
-            browser.close()
-        return None
-
-
-def parse_args():
-    """Parse command-line arguments."""
+from .models import SessionType, Prompt
+from .session_provider import FileSessionProvider
+from .bot_interface import Bot
+from .chatgpt import ChatGPTBotFactory
+from .io_utils import read_prompts_from_csv, ResultWriter
+
+
+def create_argument_parser() -> argparse.ArgumentParser:
+    """Create CLI argument parser."""
     parser = argparse.ArgumentParser(
         description="Automate ChatGPT interactions with prompts from CSV file"
     )
@@ -1386,281 +33,251 @@ def parse_args():
         "-r", "--max-attempts",
         type=int,
         default=1,
-        help="Maximum attempts to collect an answer with citations per prompt (default: 1)"
+        help="Maximum attempts per prompt to get citations (default: 1)"
     )
     parser.add_argument(
         "-o", "--output",
         default="chatgpt_results.json",
-        help="Path to output file (default: chatgpt_results.json)"
+        help="Path to output JSON file (default: chatgpt_results.json)"
     )
     parser.add_argument(
         "--sessions-dir",
         required=True,
-        help="Path to directory containing session files (use create_session.py to create sessions)"
+        help="Directory containing session files (use scripts/create_session.py to create)"
     )
     parser.add_argument(
         "--per-session-runs",
         type=int,
         default=10,
-        help="Number of runs to perform with each session before switching (default: 10)"
+        help="Evaluations per session before rotation (default: 10)"
     )
-    return parser.parse_args()
+    return parser
 
-def main():
-    """Main function to orchestrate CSV processing with citation-based retry logic."""
-    args = parse_args()
 
-    print(f"=== ChatGPT Automation ===")
+class Orchestrator:
+    """
+    Coordinates prompt evaluation with session management and retry logic.
+
+    Responsibilities:
+    - Initialize and manage bot lifecycle
+    - Handle session rotation based on usage
+    - Implement retry-until-citations logic
+    - Save results after successful evaluations
+    """
+
+    def __init__(
+        self,
+        session_provider: FileSessionProvider,
+        bot_factory: ChatGPTBotFactory,
+        result_writer: ResultWriter,
+        max_attempts: int = 1,
+    ) -> None:
+        """
+        Initialize the orchestrator.
+
+        Args:
+            session_provider: Provider for session management.
+            bot_factory: Factory for creating bot instances.
+            result_writer: Writer for saving results.
+            max_attempts: Maximum attempts per prompt to get citations.
+        """
+        self._session_provider = session_provider
+        self._bot_factory = bot_factory
+        self._result_writer = result_writer
+        self._max_attempts = max_attempts
+        self._bot: Bot | None = None
+        self._playwright = None
+
+    def run(self, prompts: list[Prompt]) -> None:
+        """
+        Process all prompts with retry and rotation logic.
+
+        Args:
+            prompts: List of prompts to evaluate.
+        """
+        total = len(prompts)
+        completed = 0
+
+        print(f"Processing {total} prompts...")
+
+        self._playwright = sync_playwright().start()
+        print("Playwright initialized\n")
+
+        try:
+            for idx, prompt in enumerate(prompts, 1):
+                print(f"\n{'='*60}")
+                print(f"Prompt {idx}/{total} (ID: {prompt.id})")
+                print(f"Text: {prompt.text}")
+                print(f"{'='*60}")
+
+                success = self._process_prompt(prompt)
+                if success:
+                    completed += 1
+
+        finally:
+            self._cleanup()
+
+        print(f"\n{'='*60}")
+        print(f"Completed {completed}/{total} prompts")
+        print(f"Results saved to {self._result_writer._output_path}")
+        print("Done!")
+
+    def _process_prompt(self, prompt: Prompt) -> bool:
+        """
+        Process a single prompt with retry logic.
+
+        Args:
+            prompt: The prompt to evaluate.
+
+        Returns:
+            True if citation was found, False otherwise.
+        """
+        for attempt in range(1, self._max_attempts + 1):
+            print(f"\n--- Attempt {attempt}/{self._max_attempts} ---")
+
+            # Ensure bot is ready
+            if not self._ensure_bot_ready():
+                continue
+
+            # For subsequent attempts, start new conversation
+            if attempt > 1:
+                if not self._bot.start_new_conversation():
+                    print("Failed to start new conversation, will retry with fresh browser...")
+                    self._reset_bot()
+                    continue
+
+            # Show session info
+            session_id = self._bot.current_session_id
+            print(f"[Using session: {session_id}]")
+
+            # Evaluate prompt
+            result = self._bot.evaluate(prompt.text)
+
+            # Record evaluation with session provider
+            remaining = self._session_provider.record_evaluation(session_id)
+            print(f"[Session evaluations remaining: {remaining}]")
+
+            if remaining == 0:
+                print("Session exhausted, will rotate on next attempt")
+                self._reset_bot()
+
+            # Check for citations
+            if result.has_citations:
+                print(f"SUCCESS! Got {len(result.citations)} citations")
+                self._result_writer.save_result(prompt, result, attempt)
+                return True
+            else:
+                print(f"No citations (attempt {attempt}/{self._max_attempts})")
+
+        # All attempts exhausted - try one more with fresh session
+        print("\nAll attempts exhausted, trying fresh session...")
+        self._reset_bot()
+
+        if self._ensure_bot_ready():
+            result = self._bot.evaluate(prompt.text)
+            self._session_provider.record_evaluation(self._bot.current_session_id)
+
+            if result.has_citations:
+                print(f"SUCCESS with fresh session! Got {len(result.citations)} citations")
+                self._result_writer.save_result(prompt, result, 1)
+                return True
+            else:
+                print("Fresh session attempt also failed - no citations")
+
+        # Final failure - save empty result
+        print(f"All attempts failed for prompt {prompt.id}")
+        self._result_writer.save_empty_result(prompt)
+        return False
+
+    def _ensure_bot_ready(self) -> bool:
+        """
+        Ensure bot is initialized with valid session.
+
+        Returns:
+            True if bot is ready, False otherwise.
+        """
+        if self._bot and self._bot.is_initialized:
+            return True
+
+        session = self._session_provider.get_session(SessionType.CHATGPT)
+        if not session:
+            print("No available sessions!")
+            return False
+
+        print(f"Loading session: {session.session_id}")
+
+        self._bot = self._bot_factory.create_bot(self._playwright)
+        if self._bot.initialize(session):
+            print(f"Ready to use session: {session.session_id}")
+            return True
+        else:
+            print(f"Failed to load session: {session.session_id}")
+            self._session_provider.mark_invalid(session.session_id)
+            self._bot = None
+            return False
+
+    def _reset_bot(self) -> None:
+        """Close current bot to force session rotation."""
+        if self._bot:
+            print("Closing browser...")
+            self._bot.close()
+            self._bot = None
+
+    def _cleanup(self) -> None:
+        """Clean up all resources."""
+        self._reset_bot()
+        if self._playwright:
+            self._playwright.stop()
+            print("Playwright stopped")
+            self._playwright = None
+
+
+def main() -> None:
+    """Main entry point."""
+    args = create_argument_parser().parse_args()
+
+    print("=== ChatGPT Automation ===")
     print(f"Input file: {args.input}")
-    print(f"Max attempts per prompt: {args.max_attempts}")
     print(f"Output file: {args.output}")
     print(f"Sessions directory: {args.sessions_dir}")
-    print(f"Per-session attempts: {args.per_session_runs}")
+    print(f"Max attempts per prompt: {args.max_attempts}")
+    print(f"Per-session runs: {args.per_session_runs}")
     print()
 
-    # Load all sessions from directory
-    session_files = load_sessions_from_dir(args.sessions_dir)
-    if not session_files:
-        print("✗ No session files found. Exiting.")
-        print("   Use create_session.py to create session files first.")
-        return
-
-    print()
-
-    # Read prompts from CSV
+    # Load prompts
     prompts = read_prompts_from_csv(args.input)
     if not prompts:
-        print("✗ No prompts found. Exiting.")
+        print("No prompts found. Exiting.")
         return
 
-    total_prompts = len(prompts)
-
-    print(f"Total prompts: {total_prompts}")
-    print(f"Max attempts per prompt: {args.max_attempts}")
     print()
 
-    # Session rotation setup
-    current_session_idx = 0
-    attempts_on_current_session = 0
-    browser_context = None
-    page = None
-    completed_prompts = 0
-
-    # Start playwright once for the entire session (reused for all browser instances)
-    print("Initializing Playwright...")
-    playwright = sync_playwright().start()
-    print("✓ Playwright initialized\n")
-
+    # Initialize components
     try:
-        for prompt_idx, prompt_data in enumerate(prompts, 1):
-            prompt_id = prompt_data['id']
-            prompt_text = prompt_data['prompt']
+        session_provider = FileSessionProvider(
+            sessions_dir=args.sessions_dir,
+            max_usage_per_session=args.per_session_runs,
+        )
+    except (FileNotFoundError, ValueError) as e:
+        print(f"Error: {e}")
+        print("Use scripts/create_session.py to create session files first.")
+        return
 
-            print(f"\n{'='*60}")
-            print(f"Prompt {prompt_idx}/{total_prompts} (ID: {prompt_id})")
-            print(f"Text: {prompt_text}")
-            print(f"{'='*60}")
+    print()
 
-            # Attempt to get answer with citations
-            attempt = 0
-            got_citations = False
+    bot_factory = ChatGPTBotFactory()
+    result_writer = ResultWriter(args.output)
 
-            # Try up to max_attempts with current session
-            while attempt < args.max_attempts and not got_citations:
-                attempt += 1
-                print(f"\n--- Attempt {attempt}/{args.max_attempts} ---")
+    # Run orchestration
+    orchestrator = Orchestrator(
+        session_provider=session_provider,
+        bot_factory=bot_factory,
+        result_writer=result_writer,
+        max_attempts=args.max_attempts,
+    )
 
-                # SESSION ROTATION LOGIC
-                # Check if we need to switch sessions
-                if attempts_on_current_session >= args.per_session_runs or browser_context is None:
-                    # Close current browser if exists
-                    if browser_context:
-                        try:
-                            print(f"\nReached {attempts_on_current_session} attempts on current session, switching...")
-                            browser, context = browser_context
-                            browser.close()
-                            print("✓ Closed previous browser")
-                        except Exception as e:
-                            print(f"Warning: Error closing browser: {e}")
-                        browser_context = None
-                        page = None
+    orchestrator.run(prompts)
 
-                    # Switch to next session (cycle through sessions)
-                    current_session_idx = (current_session_idx + 1) % len(session_files)
-                    current_session_file = session_files[current_session_idx]
-                    attempts_on_current_session = 0
-
-                    print(f"Loading session {current_session_idx + 1}/{len(session_files)}: {os.path.basename(current_session_file)}")
-
-                    # Load and validate new session
-                    result = load_and_validate_session(playwright, current_session_file)
-                    if result:
-                        browser, context, page = result
-                        browser_context = (browser, context)
-                        print(f"✓ Ready to use session: {os.path.basename(current_session_file)}\n")
-                    else:
-                        print(f"✗ Failed to load session: {os.path.basename(current_session_file)}")
-                        print("⚠ Skipping this attempt...")
-                        continue
-
-                attempts_on_current_session += 1
-                print(f"[Session {current_session_idx + 1}/{len(session_files)}: {os.path.basename(session_files[current_session_idx])}, Attempt {attempts_on_current_session}/{args.per_session_runs}]")
-
-                # For attempts after the first, start a new conversation
-                if browser_context and page and attempt > 1:
-                    if not start_new_conversation(page):
-                        print("⚠ Failed to start new conversation, will retry with fresh browser...")
-                        if browser_context:
-                            browser, context = browser_context
-                            browser.close()
-                        browser_context = None
-                        page = None
-                        # Will reload session on next iteration
-                        attempts_on_current_session = args.per_session_runs  # Force session switch
-                        continue
-
-                # Execute automation
-                try:
-                    result = chatgpt_automation(
-                        prompt=prompt_text,
-                        prompt_id=prompt_id,
-                        run_number=attempt,
-                        output_file=args.output,
-                        page=page,
-                        browser_context=browser_context
-                    )
-
-                    if result:
-                        browser_context = (result[0], result[1])
-                        page = result[2]
-                        sources = result[3]
-                        response_text = result[4]
-
-                        # Check if we got citations
-                        if has_citations(sources):
-                            print(f"✓ SUCCESS! Got answer with {len(sources)} citations")
-                            # Save the successful response with citations
-                            save_to_json(prompt_id, prompt_text, attempt, response_text, sources, args.output)
-                            print("✓ Response saved")
-                            got_citations = True
-                            completed_prompts += 1
-                            break  # Exit attempt loop, move to next prompt
-                        else:
-                            print(f"⚠ No citations in response (attempt {attempt}/{args.max_attempts})")
-                            if attempt < args.max_attempts:
-                                print("  Retrying with same session...")
-                    else:
-                        print("⚠ Attempt failed, resetting browser...")
-                        browser_context = None
-                        page = None
-                        attempts_on_current_session = args.per_session_runs  # Force session switch
-
-                except Exception as e:
-                    print(f"✗ Error during attempt: {e}")
-                    # Reset browser context on error
-                    if browser_context:
-                        try:
-                            browser, context = browser_context
-                            browser.close()
-                        except:
-                            pass
-                    browser_context = None
-                    page = None
-                    attempts_on_current_session = args.per_session_runs  # Force session switch
-
-            # After max_attempts exhausted without citations
-            if not got_citations:
-                print(f"\n⚠ Max attempts ({args.max_attempts}) exhausted without citations")
-                print("  Switching to new session for one final attempt...")
-
-                # Force session switch
-                if browser_context:
-                    try:
-                        browser, context = browser_context
-                        browser.close()
-                    except:
-                        pass
-                    browser_context = None
-                    page = None
-
-                # Switch to next session
-                current_session_idx = (current_session_idx + 1) % len(session_files)
-                current_session_file = session_files[current_session_idx]
-                attempts_on_current_session = 0
-
-                print(f"Loading new session {current_session_idx + 1}/{len(session_files)}: {os.path.basename(current_session_file)}")
-
-                # Load and validate new session
-                result = load_and_validate_session(playwright, current_session_file)
-                if result:
-                    browser, context, page = result
-                    browser_context = (browser, context)
-                    print(f"✓ Ready to use new session\n")
-
-                    # Try once with new session
-                    try:
-                        print("--- Final attempt with new session ---")
-                        result = chatgpt_automation(
-                            prompt=prompt_text,
-                            prompt_id=prompt_id,
-                            run_number=1,
-                            output_file=args.output,
-                            page=page,
-                            browser_context=browser_context
-                        )
-
-                        if result:
-                            browser_context = (result[0], result[1])
-                            page = result[2]
-                            sources = result[3]
-                            response_text = result[4]
-                            attempts_on_current_session = 1
-
-                            # Check if we got citations with new session
-                            if has_citations(sources):
-                                print(f"✓ SUCCESS with new session! Got answer with {len(sources)} citations")
-                                # Save the successful response with citations
-                                save_to_json(prompt_id, prompt_text, 1, response_text, sources, args.output)
-                                print("✓ Response saved")
-                                got_citations = True
-                                completed_prompts += 1
-                            else:
-                                print("✗ New session attempt also failed - no citations")
-                        else:
-                            print("✗ New session attempt failed")
-
-                    except Exception as e:
-                        print(f"✗ Error during new session attempt: {e}")
-                else:
-                    print(f"✗ Failed to load new session")
-
-            # If still no citations after everything, save empty response
-            if not got_citations:
-                print(f"\n✗ All attempts failed for prompt {prompt_id}")
-                save_empty_response(prompt_id, prompt_text, args.output)
-                completed_prompts += 1
-
-    finally:
-        # Clean up browser
-        if browser_context:
-            try:
-                print("\nClosing browser...")
-                browser, context = browser_context
-                browser.close()
-            except Exception as e:
-                print(f"Warning: Error closing browser: {e}")
-
-        # Stop playwright
-        try:
-            playwright.stop()
-            print("✓ Playwright stopped")
-        except Exception as e:
-            print(f"Warning: Error stopping Playwright: {e}")
-
-    print(f"\n{'='*60}")
-    print(f"✓ Completed {completed_prompts}/{total_prompts} prompts")
-    print(f"✓ Results saved to {args.output}")
-    print("Done!")
 
 if __name__ == "__main__":
     main()
