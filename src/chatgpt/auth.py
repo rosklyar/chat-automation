@@ -1,7 +1,10 @@
 """ChatGPT authentication handling."""
 
+import logging
 import re
 from playwright.sync_api import Page
+
+logger = logging.getLogger(__name__)
 
 
 class ChatGPTAuthenticator:
@@ -34,55 +37,40 @@ class ChatGPTAuthenticator:
             True if authenticated successfully
         """
         for attempt in range(1, max_attempts + 1):
-            print(f"Authentication attempt {attempt}/{max_attempts}")
-
             # Wait for any modal to appear
-            print("Waiting for login modal...")
             page.wait_for_timeout(5000)
 
             modal_type = self._detect_modal(page)
 
             if modal_type:
-                print(f"Detected modal: {modal_type}")
                 if not self._handle_modal(page, modal_type):
-                    print("Failed to handle authentication modal")
                     return False
 
                 # Wait for authentication to complete
-                print("Waiting for authentication to complete...")
                 page.wait_for_timeout(5000)
 
                 if self._is_chat_interface_ready(page):
-                    print("Authenticated successfully - chat interface ready")
                     return True
                 else:
-                    print("Chat interface not ready after authentication")
                     return False
 
             # No modal - check for login button
-            print("No modal appeared - checking for 'Log in' button...")
             login_button = self._find_login_button(page)
 
             if not login_button:
                 # No login button = already authenticated
-                print("No 'Log in' button found - verifying authentication...")
                 if self._is_chat_interface_ready(page):
-                    print("Already authenticated - chat interface ready")
                     return True
                 else:
-                    print("Neither modal nor chat interface found")
                     return False
 
             # Click login button to trigger modal
-            print("Found 'Log in' button - clicking to trigger modal...")
             try:
                 login_button.click(timeout=5000)
-                print("Clicked 'Log in' button - will retry modal detection")
-            except Exception as e:
-                print(f"Failed to click 'Log in' button: {e}")
+            except Exception:
                 return False
 
-        print("Authentication failed after maximum attempts")
+        logger.error("Authentication failed")
         return False
 
     def _detect_modal(self, page: Page) -> str | None:
@@ -115,39 +103,24 @@ class ChatGPTAuthenticator:
         # Try account button for "Welcome back"
         if modal_type == "welcome_back":
             auth_button = self._find_account_button(page)
-            if auth_button:
-                print("Found account selection button")
 
         # Fallback to "Continue with Google"
         if not auth_button:
             auth_button = self._find_google_button(page)
-            if auth_button:
-                print("Found 'Continue with Google' button")
 
         if not auth_button:
-            print("Could not find authentication button in modal")
             page.screenshot(path="auth_modal_button_not_found.png")
             return False
 
         try:
             auth_button.click(timeout=5000)
-            print("Clicked authentication button")
 
             # Wait for modal to dismiss
             page.wait_for_timeout(3000)
 
-            # Verify modal disappeared
-            try:
-                welcome = page.locator('text="Welcome back"')
-                if not welcome.is_visible(timeout=1000):
-                    print("Modal dismissed")
-            except Exception:
-                pass
-
             return True
 
-        except Exception as e:
-            print(f"Failed to click authentication button: {e}")
+        except Exception:
             page.screenshot(path="auth_modal_click_failed.png")
             return False
 

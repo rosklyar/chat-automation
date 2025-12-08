@@ -1,23 +1,30 @@
 """ChatGPT automation package."""
 
 from .models import (
-    SessionType,
     Citation,
     EvaluationResult,
     Prompt,
-    SessionInfo,
 )
 from .session_provider import SessionProvider, FileSessionProvider
 from .bot_interface import Bot, BotFactory
 from .chatgpt import ChatGPTBot, ChatGPTBotFactory
+from .prompt_provider import (
+    PromptProvider,
+    CsvPromptProvider,
+    PromptParseError,
+)
+from .result_persister import (
+    ResultPersister,
+    JsonResultPersister,
+    PersistenceError,
+)
+from .shutdown_handler import ShutdownHandler
 
 __all__ = [
     # Models
-    "SessionType",
     "Citation",
     "EvaluationResult",
     "Prompt",
-    "SessionInfo",
     # Session Provider
     "SessionProvider",
     "FileSessionProvider",
@@ -27,4 +34,14 @@ __all__ = [
     # ChatGPT Implementation
     "ChatGPTBot",
     "ChatGPTBotFactory",
+    # Prompt Provider
+    "PromptProvider",
+    "CsvPromptProvider",
+    "PromptParseError",
+    # Result Persister
+    "ResultPersister",
+    "JsonResultPersister",
+    "PersistenceError",
+    # Shutdown Handler
+    "ShutdownHandler",
 ]

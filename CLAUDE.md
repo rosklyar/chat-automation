@@ -19,8 +19,17 @@ This project automates interactions with the ChatGPT web application using Playw
 mkdir sessions
 uv run scripts/create_session.py --output sessions/account1.json
 
-# Run the main application with saved sessions
+# Run the main application with saved sessions (batch mode)
 uv run src/bot.py --sessions-dir sessions --input prompts.csv --max-attempts 3
+
+# Run in continuous mode (watches CSV for new prompts)
+uv run src/bot.py \
+  --sessions-dir sessions \
+  --input prompts.csv \
+  --watch-csv \
+  --poll-retry-seconds 10 \
+  --idle-timeout-minutes 30 \
+  --max-attempts 3
 
 # Run tests
 uv run pytest
@@ -46,7 +55,10 @@ chat-automation/
         models.py                  # Data classes (SessionType, Citation, EvaluationResult, etc.)
         session_provider.py        # SessionProvider protocol + FileSessionProvider
         bot_interface.py           # Bot protocol definition
-        io_utils.py                # CSV reading, JSON saving utilities
+        prompt_provider.py         # PromptProvider protocol + CsvPromptProvider
+        result_persister.py        # ResultPersister protocol + JsonResultPersister
+        shutdown_handler.py        # Graceful shutdown handling
+        logging_config.py          # Logging configuration
         bot.py                     # Main orchestration (Orchestrator class)
         chatgpt/
             __init__.py            # ChatGPT package exports
@@ -77,6 +89,27 @@ Implementation of Bot protocol for ChatGPT web automation.
 - Uses Playwright for browser control
 - Handles authentication modals automatically
 - Extracts citations from responses
+
+### PromptProvider
+Protocol for sourcing prompts from various sources (CSV, Kafka, APIs).
+- `poll() -> Optional[Prompt]` - Get next prompt if available
+- `is_exhausted` property - Check if source has no more prompts
+- `close()` - Release resources (files, connections)
+- **CsvPromptProvider**: Reads from CSV files, supports file watching (tail -f style) in continuous mode
+
+### ResultPersister
+Protocol for persisting evaluation results to various backends.
+- `save(prompt, result, run_number)` - Persist a single evaluation result
+- `output_location` property - Human-readable description of storage location
+- `close()` - Ensure all data is persisted and release resources
+- **JsonResultPersister**: Stores results in JSON files, groups by prompt_id
+
+### ShutdownHandler
+Manages graceful shutdown for long-running processes.
+- `should_shutdown` property - Check if shutdown has been requested
+- `shutdown_event` property - Threading.Event for interruptible waits
+- `install_signal_handlers()` - Register SIGINT/SIGTERM handlers
+- Enables Ctrl+C graceful shutdown in continuous mode
 
 ## Session Management
 
@@ -117,6 +150,9 @@ uv run src/bot.py --sessions-dir ./sessions --input prompts.csv --max-attempts 3
 - `--per-session-runs N` - Number of attempts per session before switching (default: 10)
 - `-i, --input` - Input CSV file with prompts (default: prompts.csv)
 - `-o, --output` - Output JSON file (default: chatgpt_results.json)
+- `--watch-csv` - Watch CSV file for new appends (continuous mode)
+- `--poll-retry-seconds N` - Seconds to wait when no prompts available (default: 5.0)
+- `--idle-timeout-minutes N` - Close browser after N minutes of inactivity (default: never)
 
 ### Benefits
 
@@ -124,6 +160,38 @@ uv run src/bot.py --sessions-dir ./sessions --input prompts.csv --max-attempts 3
 - Automatic rotation - Session switching handled automatically
 - Round-robin cycling - Sessions reused indefinitely
 - Clean separation - Session management decoupled from bot logic
+
+## Operating Modes
+
+### Batch Mode (Default)
+Process all prompts from CSV once and exit.
+
+```bash
+uv run src/bot.py --sessions-dir sessions --input prompts.csv --max-attempts 3
+```
+
+- Reads entire CSV at startup
+- Processes each prompt sequentially
+- Exits when all prompts completed
+- Use when you have a fixed list of prompts
+
+### Continuous Mode (--watch-csv)
+Run indefinitely, polling for new prompts.
+
+```bash
+uv run src/bot.py \
+  --sessions-dir sessions \
+  --input prompts.csv \
+  --watch-csv \
+  --poll-retry-seconds 10 \
+  --idle-timeout-minutes 30
+```
+
+- Watches CSV file for appends (tail -f style)
+- Polls continuously, waiting when no prompts available
+- Closes browser during idle periods to save resources
+- Press Ctrl+C for graceful shutdown
+- Ideal for integration with prompt schedulers and Kafka consumers (future)
 
 ## Architecture
 

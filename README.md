@@ -58,6 +58,7 @@ The ChatGPT automation bot is fully implemented and uses:
 - **Playwright** for browser automation
 - **Docker + Xvfb** for headful browser execution (bypasses Cloudflare detection)
 - **Session rotation** to distribute load across multiple Google accounts
+- **Continuous polling** for processing prompts from various sources (CSV, Kafka, APIs)
 
 ### Build Docker Image
 
@@ -80,7 +81,7 @@ uv run src/create_session.py --output sessions/account2.json
 uv run src/create_session.py --output sessions/account3.json
 ```
 
-**Run with session rotation:**
+**Run in batch mode (process CSV once and exit):**
 
 ```bash
 docker run --rm \
@@ -97,11 +98,41 @@ docker run --rm \
   --output /app/results/output.json
 ```
 
+**Run in continuous mode (watch CSV for new prompts):**
+
+```bash
+docker run --rm \
+  --shm-size=2gb \
+  --security-opt seccomp:unconfined \
+  -v $(pwd)/prompts.csv:/app/prompts.csv:ro \
+  -v $(pwd)/sessions:/app/sessions:ro \
+  -v $(pwd)/results:/app/results \
+  chatgpt-automation \
+  --input /app/prompts.csv \
+  --sessions-dir /app/sessions \
+  --max-attempts 3 \
+  --per-session-runs 5 \
+  --output /app/results/output.json \
+  --watch-csv \
+  --poll-retry-seconds 10 \
+  --idle-timeout-minutes 30
+```
+
 **How it works:**
-- The bot attempts to get an answer **with citations** for each prompt
+
+**Batch Mode (default):**
+- Processes all prompts in CSV once and exits
+- For each prompt, attempts to get an answer **with citations**
 - If no citations found, retries up to `--max-attempts` times with the same session
 - After max attempts exhausted, switches to a new session and tries once more
 - If still no citations, saves an empty response and moves to next prompt
+
+**Continuous Mode (--watch-csv):**
+- Runs indefinitely, polling for new prompts
+- Watches CSV file for appends (tail -f style)
+- Waits `--poll-retry-seconds` when no prompts available
+- Graceful shutdown with Ctrl+C
+- Closes browser after `--idle-timeout-minutes` of inactivity (if specified)
 
 **Input Format** (CSV):
 ```csv
@@ -147,8 +178,17 @@ uv run playwright install chromium
 mkdir sessions
 uv run src/create_session.py --output sessions/account1.json
 
-# Run automation
+# Run automation (batch mode)
 uv run src/bot.py --sessions-dir sessions --input prompts.csv --max-attempts 3
+
+# Run in continuous mode (watches CSV for new prompts)
+uv run src/bot.py \
+  --sessions-dir sessions \
+  --input prompts.csv \
+  --watch-csv \
+  --poll-retry-seconds 10 \
+  --idle-timeout-minutes 30 \
+  --max-attempts 3
 
 # Run tests
 uv run pytest
@@ -173,3 +213,6 @@ uv run pytest
 | `--max-attempts` | Max attempts to get citations per prompt | `3` | No (default: `1`) |
 | `--per-session-runs` | Attempts before session switch | `5` | No (default: `10`) |
 | `--output` | Output JSON file | `/app/results/output.json` | No (default: `chatgpt_results.json`) |
+| `--watch-csv` | Enable continuous CSV file monitoring | N/A | No (default: disabled) |
+| `--poll-retry-seconds` | Seconds to wait when no prompts available | `10` | No (default: `5.0`) |
+| `--idle-timeout-minutes` | Close browser after N minutes of inactivity | `30` | No (default: never) |

@@ -1,10 +1,13 @@
 """Citation extraction from ChatGPT responses."""
 
+import logging
 import re
 from typing import Optional
 from playwright.sync_api import Page, Locator
 
 from ..models import Citation
+
+logger = logging.getLogger(__name__)
 
 
 class CitationExtractor:
@@ -32,35 +35,27 @@ class CitationExtractor:
         citations = []
 
         try:
-            print("\nExtracting sources...")
-
             # Find sources button
             sources_button = self._find_sources_button(page)
             if not sources_button:
-                print("  No sources button found - response may not have cited sources")
                 return citations
 
             # Count asides before clicking
             asides_before = page.locator('aside').count()
-            print(f"  Asides before click: {asides_before}")
 
             # Click to open panel
-            print("  Clicking sources button to open sidebar...")
             sources_button.click()
             page.wait_for_timeout(3000)
 
             # Find citations panel
             panel = self._find_citations_panel(page, asides_before)
             if not panel:
-                print("  Could not find Citations panel after clicking button")
                 self._close_panel(page)
                 return citations
 
             # Wait for panel content
             try:
-                print("  Waiting for panel content to load...")
                 panel.locator('a').first.wait_for(state="visible", timeout=5000)
-                print("  Panel content loaded")
             except Exception:
                 page.wait_for_timeout(2000)
 
@@ -70,13 +65,11 @@ class CitationExtractor:
             # Close panel
             self._close_panel(page)
 
-            if citations:
-                print(f"  Successfully extracted {len(citations)} sources")
-            else:
-                print("  No sources were extracted from panel")
+            if not citations:
+                logger.warning("No sources extracted")
 
         except Exception as e:
-            print(f"  Error during source extraction: {e}")
+            logger.error(f"Source extraction error: {e}")
             self._close_panel(page)
 
         return citations
@@ -88,7 +81,6 @@ class CitationExtractor:
             try:
                 btn = page.get_by_role("button", name=label)
                 if btn.count() > 0:
-                    print(f"  Found sources button: '{label}'")
                     return btn
             except Exception:
                 pass
@@ -97,7 +89,6 @@ class CitationExtractor:
         try:
             btn = page.locator('button:has-text("Джерела"), button:has-text("Sources")').last
             if btn.count() > 0:
-                print("  Found sources button using text search")
                 return btn
         except Exception:
             pass
@@ -111,13 +102,11 @@ class CitationExtractor:
         # Strategy 1: Look for container by structure
         panel = self._find_by_css_structure(page)
         if panel:
-            print("  Found citations panel by CSS structure")
             return panel
 
         # Strategy 2: Look for container with citation header + links
         panel = self._find_by_content_structure(page)
         if panel:
-            print("  Found citations panel by content structure")
             return panel
 
         # Strategy 3: Look for new aside on right side
@@ -126,13 +115,11 @@ class CitationExtractor:
                 f'document.querySelectorAll("aside").length > {asides_before}',
                 timeout=5000
             )
-            print("  New aside appeared after clicking")
         except Exception:
-            print("  No new aside detected, will search existing ones")
+            pass
 
         # Search asides for citations panel
         asides = page.locator('aside').all()
-        print(f"  Total asides now: {len(asides)}")
 
         for idx, aside in enumerate(asides):
             try:
@@ -161,7 +148,6 @@ class CitationExtractor:
                         len(text) > 100
                     )
                     if has_citations:
-                        print(f"  Found Citations panel (aside #{idx+1}) at x={box['x']}")
                         return aside
 
             except Exception:
@@ -173,7 +159,6 @@ class CitationExtractor:
             try:
                 text_check = last_aside.inner_text()
                 if "New chat" not in text_check:
-                    print("  Using last aside as fallback")
                     return last_aside
             except Exception:
                 pass
@@ -189,7 +174,6 @@ class CitationExtractor:
                 if any(header in text for header in ["Цитати", "Citations", "Джерела", "Цитування"]):
                     links_count = container.locator('a[target="_blank"][href^="http"]').count()
                     if links_count >= 2:
-                        print(f"    Found citations container ({links_count} links)")
                         return container
         except Exception:
             pass
@@ -221,7 +205,6 @@ class CitationExtractor:
         # Strategy 0: Direct ul > li > a structure
         citations = self._extract_from_list_structure(panel)
         if citations:
-            print(f"  Strategy 0 (list structure) succeeded: {len(citations)} citations")
             return citations
 
         # Strategy 1-8: Various link selectors
@@ -240,7 +223,6 @@ class CitationExtractor:
             try:
                 links = panel.locator(selector).all()
                 if links:
-                    print(f"  Strategy ({name}): found {len(links)} links")
                     citations = self._parse_links(links)
                     if citations:
                         return citations
@@ -248,7 +230,6 @@ class CitationExtractor:
                 continue
 
         # Strategy 9: Manual text parsing as last resort
-        print("  Attempting manual text parsing...")
         citations = self._extract_from_text(panel)
 
         return citations
@@ -302,10 +283,9 @@ class CitationExtractor:
                         text_combined = f"Source {idx}"
 
                     citations.append(Citation(url=url, text=text_combined, number=idx))
-                    print(f"      [{idx}] {name[:50]} - {url[:50]}...")
 
-                except Exception as e:
-                    print(f"      Error extracting citation {idx}: {e}")
+                except Exception:
+                    pass
 
         except Exception:
             pass
@@ -350,7 +330,6 @@ class CitationExtractor:
 
             # Find URLs in text
             urls = re.findall(r'https?://[^\s\)]+', panel_text)
-            print(f"  Found {len(urls)} URLs in panel text via regex")
 
             # Parse structured entries
             lines = panel_text.split('\n')
@@ -388,7 +367,6 @@ class CitationExtractor:
             if current_citation and 'name' in current_citation:
                 citations_parsed.append(current_citation)
 
-            print(f"  Parsed {len(citations_parsed)} structured citations from text")
 
             # Create Citation objects
             for idx, citation_data in enumerate(citations_parsed, 1):
@@ -403,11 +381,9 @@ class CitationExtractor:
                     text=text,
                     number=idx
                 ))
-                print(f"    [{idx}] {name} - {url if url else 'No URL'}")
 
             # Fallback to URL-based extraction
             if not citations and urls:
-                print("  Falling back to URL-based extraction...")
                 for idx, url in enumerate(urls, 1):
                     name = f"Source {idx}"
 
@@ -422,10 +398,9 @@ class CitationExtractor:
                                 name = potential_name
 
                     citations.append(Citation(url=url, text=name, number=idx))
-                    print(f"    [{idx}] {name} - {url}")
 
         except Exception as e:
-            print(f"  Manual parsing failed: {e}")
+            logger.warning(f"Manual parsing failed: {e}")
 
         return citations
 
@@ -434,6 +409,5 @@ class CitationExtractor:
         try:
             page.keyboard.press("Escape")
             page.wait_for_timeout(500)
-            print("  Panel closed")
         except Exception:
             pass
