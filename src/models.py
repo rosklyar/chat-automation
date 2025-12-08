@@ -2,15 +2,7 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum, auto
 from typing import Optional
-
-
-class SessionType(Enum):
-    """Supported AI provider session types."""
-    CHATGPT = auto()
-    # Future: CLAUDE = auto()
-    # Future: GEMINI = auto()
 
 
 @dataclass(frozen=True)
@@ -48,29 +40,20 @@ class EvaluationResult:
         }
 
 
+@dataclass(frozen=True)
+class EvaluationRecorded:
+    """Result of recording an evaluation with the session provider."""
+    remaining: int
+    rotated: bool
+
+    @property
+    def should_reset_bot(self) -> bool:
+        """Convenience property - rotation means browser needs reset."""
+        return self.rotated
+
+
 @dataclass
 class Prompt:
     """A prompt to be evaluated."""
     id: str
     text: str
-
-
-@dataclass
-class SessionInfo:
-    """Information about a managed session."""
-    session_id: str
-    session_type: SessionType
-    file_path: str
-    usage_count: int = 0
-    max_usage: int = 10
-    is_valid: bool = True
-
-    @property
-    def evaluations_remaining(self) -> int:
-        """Number of evaluations left before rotation needed."""
-        return max(0, self.max_usage - self.usage_count)
-
-    @property
-    def needs_rotation(self) -> bool:
-        """Check if this session has exhausted its usage limit."""
-        return self.usage_count >= self.max_usage

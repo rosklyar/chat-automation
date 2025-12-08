@@ -1,8 +1,8 @@
 """Bot protocol definitions for AI assistant automation."""
 
-from typing import Protocol, Optional, runtime_checkable, Any
+from typing import Protocol, runtime_checkable, Any
 
-from .models import EvaluationResult, SessionInfo
+from .models import EvaluationResult
 
 
 @runtime_checkable
@@ -21,14 +21,14 @@ class Bot(Protocol):
     session for multiple evaluations.
     """
 
-    def initialize(self, session_info: SessionInfo) -> bool:
+    def initialize(self, storage_state: dict) -> bool:
         """
         Initialize the bot with a session.
 
         Launches browser, loads session state, and validates authentication.
 
         Args:
-            session_info: Session to use for authentication.
+            storage_state: Playwright StorageState dict with 'cookies' and 'origins'.
 
         Returns:
             True if initialization successful and authenticated.
@@ -70,11 +70,6 @@ class Bot(Protocol):
     @property
     def is_initialized(self) -> bool:
         """Check if the bot is initialized and ready for evaluation."""
-        ...
-
-    @property
-    def current_session_id(self) -> Optional[str]:
-        """ID of the currently loaded session, if any."""
         ...
 
 

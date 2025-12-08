@@ -9,25 +9,51 @@ This module coordinates:
 """
 
 import argparse
+import logging
+import time
+from pathlib import Path
+from typing import Optional
 
 from playwright.sync_api import sync_playwright
 
-from .models import SessionType, Prompt
+from .models import Prompt, EvaluationResult
 from .session_provider import FileSessionProvider
 from .bot_interface import Bot
 from .chatgpt import ChatGPTBotFactory
-from .io_utils import read_prompts_from_csv, ResultWriter
+from .prompt_provider import PromptProvider, CsvPromptProvider
+from .result_persister import ResultPersister, JsonResultPersister
+from .logging_config import setup_logging
+from .shutdown_handler import ShutdownHandler
+
+logger = logging.getLogger(__name__)
 
 
 def create_argument_parser() -> argparse.ArgumentParser:
     """Create CLI argument parser."""
     parser = argparse.ArgumentParser(
-        description="Automate ChatGPT interactions with prompts from CSV file"
+        description="Automate ChatGPT interactions with continuous prompt polling"
     )
     parser.add_argument(
         "-i", "--input",
         default="prompts.csv",
         help="Path to input CSV file with prompts (default: prompts.csv)"
+    )
+    parser.add_argument(
+        "--watch-csv",
+        action="store_true",
+        help="Watch CSV file for new appends (continuous mode)"
+    )
+    parser.add_argument(
+        "--poll-retry-seconds",
+        type=float,
+        default=5.0,
+        help="Seconds to wait when no prompts available (default: 5.0)"
+    )
+    parser.add_argument(
+        "--idle-timeout-minutes",
+        type=float,
+        default=None,
+        help="Close browser after N minutes of inactivity (default: never)"
     )
     parser.add_argument(
         "-r", "--max-attempts",
@@ -51,6 +77,17 @@ def create_argument_parser() -> argparse.ArgumentParser:
         default=10,
         help="Evaluations per session before rotation (default: 10)"
     )
+    parser.add_argument(
+        "--log-level",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        default="INFO",
+        help="Set logging level (default: INFO)"
+    )
+    parser.add_argument(
+        "--log-file",
+        type=Path,
+        help="Optional log file path for persistent logging"
+    )
     return parser
 
 
@@ -69,8 +106,11 @@ class Orchestrator:
         self,
         session_provider: FileSessionProvider,
         bot_factory: ChatGPTBotFactory,
-        result_writer: ResultWriter,
+        prompt_provider: PromptProvider,
+        result_persister: ResultPersister,
         max_attempts: int = 1,
+        poll_retry_seconds: float = 5.0,
+        idle_timeout_minutes: Optional[float] = None,
     ) -> None:
         """
         Initialize the orchestrator.
@@ -78,49 +118,78 @@ class Orchestrator:
         Args:
             session_provider: Provider for session management.
             bot_factory: Factory for creating bot instances.
-            result_writer: Writer for saving results.
+            prompt_provider: Provider for sourcing prompts.
+            result_persister: Persister for storing results.
             max_attempts: Maximum attempts per prompt to get citations.
+            poll_retry_seconds: Seconds to wait when poll() returns None.
+            idle_timeout_minutes: Close browser after N minutes idle (None = never).
         """
         self._session_provider = session_provider
         self._bot_factory = bot_factory
-        self._result_writer = result_writer
+        self._prompt_provider = prompt_provider
+        self._result_persister = result_persister
         self._max_attempts = max_attempts
+        self._poll_retry_seconds = poll_retry_seconds
+        self._idle_timeout_seconds = (
+            idle_timeout_minutes * 60 if idle_timeout_minutes else None
+        )
         self._bot: Bot | None = None
         self._playwright = None
+        self._shutdown_handler = ShutdownHandler()
+        self._last_prompt_time: Optional[float] = None
 
-    def run(self, prompts: list[Prompt]) -> None:
-        """
-        Process all prompts with retry and rotation logic.
-
-        Args:
-            prompts: List of prompts to evaluate.
-        """
-        total = len(prompts)
+    def run(self) -> None:
+        """Process prompts continuously with retry and rotation logic."""
+        processed = 0
         completed = 0
 
-        print(f"Processing {total} prompts...")
+        logger.info("Starting continuous prompt processing (Ctrl+C to stop)")
+
+        # Install signal handlers
+        self._shutdown_handler.install_signal_handlers()
 
         self._playwright = sync_playwright().start()
-        print("Playwright initialized\n")
 
         try:
-            for idx, prompt in enumerate(prompts, 1):
-                print(f"\n{'='*60}")
-                print(f"Prompt {idx}/{total} (ID: {prompt.id})")
-                print(f"Text: {prompt.text}")
-                print(f"{'='*60}")
+            with self._prompt_provider:
+                while not self._shutdown_handler.should_shutdown:
+                    # Poll for next prompt
+                    prompt = self._prompt_provider.poll()
 
-                success = self._process_prompt(prompt)
-                if success:
-                    completed += 1
+                    if prompt is None:
+                        # No prompt available - wait and retry
+                        logger.debug(
+                            f"No prompts available, waiting {self._poll_retry_seconds}s..."
+                        )
+
+                        # Check for idle timeout
+                        self._check_idle_timeout()
+
+                        # Interruptible wait using shutdown event
+                        self._shutdown_handler.shutdown_event.wait(
+                            timeout=self._poll_retry_seconds
+                        )
+                        continue
+
+                    # Process the prompt
+                    processed += 1
+                    self._last_prompt_time = time.time()
+                    logger.info(
+                        f"\nPrompt {processed} (ID: {prompt.id}): {prompt.text[:100]}..."
+                    )
+
+                    success = self._process_prompt(prompt)
+                    if success:
+                        completed += 1
 
         finally:
+            self._shutdown_handler.restore_signal_handlers()
             self._cleanup()
 
-        print(f"\n{'='*60}")
-        print(f"Completed {completed}/{total} prompts")
-        print(f"Results saved to {self._result_writer._output_path}")
-        print("Done!")
+        logger.info(
+            f"\nShutdown complete. Processed {completed}/{processed} prompts - "
+            f"Results saved to {self._result_persister.output_location}"
+        )
 
     def _process_prompt(self, prompt: Prompt) -> bool:
         """
@@ -133,8 +202,6 @@ class Orchestrator:
             True if citation was found, False otherwise.
         """
         for attempt in range(1, self._max_attempts + 1):
-            print(f"\n--- Attempt {attempt}/{self._max_attempts} ---")
-
             # Ensure bot is ready
             if not self._ensure_bot_ready():
                 continue
@@ -142,51 +209,45 @@ class Orchestrator:
             # For subsequent attempts, start new conversation
             if attempt > 1:
                 if not self._bot.start_new_conversation():
-                    print("Failed to start new conversation, will retry with fresh browser...")
+                    logger.warning("Failed to start new conversation, retrying with fresh browser")
                     self._reset_bot()
                     continue
-
-            # Show session info
-            session_id = self._bot.current_session_id
-            print(f"[Using session: {session_id}]")
 
             # Evaluate prompt
             result = self._bot.evaluate(prompt.text)
 
-            # Record evaluation with session provider
-            remaining = self._session_provider.record_evaluation(session_id)
-            print(f"[Session evaluations remaining: {remaining}]")
-
-            if remaining == 0:
-                print("Session exhausted, will rotate on next attempt")
+            # Record evaluation - CHECK FOR EAGER ROTATION
+            recorded = self._session_provider.record_evaluation()
+            if recorded.rotated:
+                logger.info("Session exhausted, resetting browser")
                 self._reset_bot()
 
             # Check for citations
             if result.has_citations:
-                print(f"SUCCESS! Got {len(result.citations)} citations")
-                self._result_writer.save_result(prompt, result, attempt)
+                logger.info(f"✓ Got {len(result.citations)} citations")
+                self._result_persister.save(prompt, result, attempt)
                 return True
-            else:
-                print(f"No citations (attempt {attempt}/{self._max_attempts})")
 
-        # All attempts exhausted - try one more with fresh session
-        print("\nAll attempts exhausted, trying fresh session...")
+        # All attempts exhausted - try ONCE with fresh session (manual fallback)
+        logger.info("Switching to fresh session for final retry")
+        self._session_provider.force_rotate()
         self._reset_bot()
 
         if self._ensure_bot_ready():
             result = self._bot.evaluate(prompt.text)
-            self._session_provider.record_evaluation(self._bot.current_session_id)
+            recorded = self._session_provider.record_evaluation()
+            if recorded.rotated:
+                self._reset_bot()
 
             if result.has_citations:
-                print(f"SUCCESS with fresh session! Got {len(result.citations)} citations")
-                self._result_writer.save_result(prompt, result, 1)
+                logger.info(f"✓ Got citations with fresh session")
+                self._result_persister.save(prompt, result, 1)
                 return True
-            else:
-                print("Fresh session attempt also failed - no citations")
 
         # Final failure - save empty result
-        print(f"All attempts failed for prompt {prompt.id}")
-        self._result_writer.save_empty_result(prompt)
+        logger.error(f"✗ Failed to get citations for prompt {prompt.id}")
+        empty_result = EvaluationResult(response_text="", citations=[], success=False)
+        self._result_persister.save(prompt, empty_result, run_number=0)
         return False
 
     def _ensure_bot_ready(self) -> bool:
@@ -199,36 +260,49 @@ class Orchestrator:
         if self._bot and self._bot.is_initialized:
             return True
 
-        session = self._session_provider.get_session(SessionType.CHATGPT)
-        if not session:
-            print("No available sessions!")
+        storage_state = self._session_provider.get_session()
+        if not storage_state:
+            logger.error("No available sessions")
             return False
 
-        print(f"Loading session: {session.session_id}")
-
         self._bot = self._bot_factory.create_bot(self._playwright)
-        if self._bot.initialize(session):
-            print(f"Ready to use session: {session.session_id}")
+        if self._bot.initialize(storage_state):
             return True
         else:
-            print(f"Failed to load session: {session.session_id}")
-            self._session_provider.mark_invalid(session.session_id)
+            logger.error(f"Failed to load session: {self._session_provider.current_session_name}")
+            self._session_provider.force_rotate()
             self._bot = None
             return False
 
     def _reset_bot(self) -> None:
         """Close current bot to force session rotation."""
         if self._bot:
-            print("Closing browser...")
             self._bot.close()
             self._bot = None
+
+    def _check_idle_timeout(self) -> None:
+        """Close browser if idle timeout exceeded."""
+        if self._idle_timeout_seconds is None:
+            return
+
+        if self._last_prompt_time is None:
+            return
+
+        idle_duration = time.time() - self._last_prompt_time
+
+        if idle_duration > self._idle_timeout_seconds:
+            logger.info(
+                f"Idle timeout ({self._idle_timeout_seconds/60:.1f} min) exceeded, "
+                f"closing browser to save resources"
+            )
+            self._reset_bot()
+            self._last_prompt_time = None  # Reset timer
 
     def _cleanup(self) -> None:
         """Clean up all resources."""
         self._reset_bot()
         if self._playwright:
             self._playwright.stop()
-            print("Playwright stopped")
             self._playwright = None
 
 
@@ -236,21 +310,22 @@ def main() -> None:
     """Main entry point."""
     args = create_argument_parser().parse_args()
 
-    print("=== ChatGPT Automation ===")
-    print(f"Input file: {args.input}")
-    print(f"Output file: {args.output}")
-    print(f"Sessions directory: {args.sessions_dir}")
-    print(f"Max attempts per prompt: {args.max_attempts}")
-    print(f"Per-session runs: {args.per_session_runs}")
-    print()
+    # Setup logging first
+    setup_logging(level=args.log_level, log_file=args.log_file)
 
-    # Load prompts
-    prompts = read_prompts_from_csv(args.input)
-    if not prompts:
-        print("No prompts found. Exiting.")
+    # Create prompt provider with watch mode
+    try:
+        prompt_provider = CsvPromptProvider(
+            csv_path=args.input,
+            watch_for_changes=args.watch_csv,
+            poll_interval_seconds=1.0
+        )
+    except FileNotFoundError:
+        logger.error(f"Input file not found: {args.input}")
         return
-
-    print()
+    except Exception as e:
+        logger.error(f"Error loading prompts: {e}")
+        return
 
     # Initialize components
     try:
@@ -259,24 +334,25 @@ def main() -> None:
             max_usage_per_session=args.per_session_runs,
         )
     except (FileNotFoundError, ValueError) as e:
-        print(f"Error: {e}")
-        print("Use scripts/create_session.py to create session files first.")
+        logger.error(f"{e}")
+        logger.error("Use scripts/create_session.py to create session files first")
         return
 
-    print()
-
     bot_factory = ChatGPTBotFactory()
-    result_writer = ResultWriter(args.output)
+    result_persister = JsonResultPersister(args.output)
 
     # Run orchestration
     orchestrator = Orchestrator(
         session_provider=session_provider,
         bot_factory=bot_factory,
-        result_writer=result_writer,
+        prompt_provider=prompt_provider,
+        result_persister=result_persister,
         max_attempts=args.max_attempts,
+        poll_retry_seconds=args.poll_retry_seconds,
+        idle_timeout_minutes=args.idle_timeout_minutes,
     )
 
-    orchestrator.run(prompts)
+    orchestrator.run()
 
 
 if __name__ == "__main__":

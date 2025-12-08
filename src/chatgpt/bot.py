@@ -1,12 +1,16 @@
 """ChatGPT bot implementation."""
 
+import logging
+from pathlib import Path
 from typing import Optional, Any
 
 from playwright.sync_api import Page, Browser, BrowserContext
 
-from ..models import EvaluationResult, SessionInfo, Citation
+from ..models import EvaluationResult
 from .auth import ChatGPTAuthenticator
 from .citation_extractor import CitationExtractor
+
+logger = logging.getLogger(__name__)
 
 
 class ChatGPTBot:
@@ -43,16 +47,16 @@ class ChatGPTBot:
         self._browser: Optional[Browser] = None
         self._context: Optional[BrowserContext] = None
         self._page: Optional[Page] = None
-        self._session_info: Optional[SessionInfo] = None
+        self._is_initialized: bool = False
         self._authenticator = ChatGPTAuthenticator()
         self._citation_extractor = CitationExtractor()
 
-    def initialize(self, session_info: SessionInfo) -> bool:
+    def initialize(self, storage_state: dict) -> bool:
         """
         Initialize with session and validate authentication.
 
         Args:
-            session_info: Session to use for authentication.
+            storage_state: Playwright StorageState dict with 'cookies' and 'origins'.
 
         Returns:
             True if initialization successful and authenticated.
@@ -60,10 +64,6 @@ class ChatGPTBot:
         self.close()  # Clean up any existing session
 
         try:
-            print(f"\n{'='*60}")
-            print(f"Loading session: {session_info.session_id}")
-            print(f"{'='*60}")
-
             # Launch browser
             self._browser = self._playwright.chromium.launch(
                 headless=False,
@@ -72,7 +72,7 @@ class ChatGPTBot:
 
             # Create context with session state
             self._context = self._browser.new_context(
-                storage_state=session_info.file_path,
+                storage_state=storage_state,
                 viewport=self.VIEWPORT,
                 user_agent=self.USER_AGENT,
             )
@@ -86,22 +86,19 @@ class ChatGPTBot:
             """)
 
             # Navigate and authenticate
-            print("Navigating to ChatGPT...")
             self._page.goto(self.BASE_URL, timeout=60000)
             self._page.wait_for_load_state("domcontentloaded")
-            print(f"Page loaded. Current URL: {self._page.url}")
 
             if self._authenticator.authenticate_if_needed(self._page):
-                self._session_info = session_info
-                print(f"Session loaded and validated: {session_info.session_id}\n")
+                self._is_initialized = True
                 return True
             else:
-                print(f"Session expired or invalid: {session_info.session_id}")
+                logger.error("Session expired or invalid")
                 self.close()
                 return False
 
         except Exception as e:
-            print(f"ChatGPTBot initialization failed: {e}")
+            logger.error(f"Bot initialization failed: {e}")
             self.close()
             return False
 
@@ -123,21 +120,17 @@ class ChatGPTBot:
 
         try:
             # Find and fill prompt textarea
-            print(f"Entering prompt: {prompt[:100]}...")
             textarea = self._page.locator("#prompt-textarea")
             textarea.fill(prompt)
             textarea.press("Enter")
 
             # Wait for response generation
-            print("Waiting for response...")
             self._wait_for_response_complete()
 
             # Extract response text
             response_text = self._extract_response_text()
-            if response_text and len(response_text) > 50:
-                print(f"Response found ({len(response_text)} chars)")
-            else:
-                print("Warning: Could not find response or response too short")
+            if not response_text or len(response_text) < 50:
+                logger.warning("Response too short or not found")
 
             # Extract citations
             citations = self._citation_extractor.extract(self._page)
@@ -149,7 +142,7 @@ class ChatGPTBot:
             )
 
         except Exception as e:
-            print(f"Evaluation error: {e}")
+            logger.error(f"Evaluation error: {e}")
             return EvaluationResult(
                 response_text="",
                 citations=[],
@@ -167,23 +160,21 @@ class ChatGPTBot:
         if not self._page:
             return False
 
-        print("\nStarting new conversation...")
         try:
             self._page.goto(self.BASE_URL, timeout=60000)
             self._page.wait_for_load_state("domcontentloaded")
 
             if not self._authenticator.authenticate_if_needed(self._page):
-                print("Authentication check completed with warnings")
+                logger.warning("Authentication check completed with warnings")
 
             # Wait for textarea to be ready
             textarea = self._page.locator("#prompt-textarea")
             textarea.wait_for(timeout=30000)
 
-            print("New conversation ready")
             return True
 
         except Exception as e:
-            print(f"Failed to start new conversation: {e}")
+            logger.error(f"Failed to start new conversation: {e}")
             return False
 
     def close(self) -> None:
@@ -202,22 +193,17 @@ class ChatGPTBot:
                 pass
         self._browser = None
         self._context = None
-        self._session_info = None
+        self._is_initialized = False
 
     @property
     def is_initialized(self) -> bool:
         """Check if the bot is initialized and ready."""
         return (
-            self._browser is not None
+            self._is_initialized
+            and self._browser is not None
             and self._page is not None
             and not self._page.is_closed()
-            and self._session_info is not None
         )
-
-    @property
-    def current_session_id(self) -> Optional[str]:
-        """ID of the currently loaded session."""
-        return self._session_info.session_id if self._session_info else None
 
     def _wait_for_response_complete(self) -> None:
         """Wait for ChatGPT to finish generating response."""
@@ -256,9 +242,7 @@ class ChatGPTBot:
 
         # Fallback: parse page text
         try:
-            full_text = self._page.locator("body").inner_text()
-            # This is a simplified fallback - the full parsing logic
-            # would be too complex for a fallback
+            self._page.locator("body").inner_text()
             return "No response found"
         except Exception:
             return "No response found"

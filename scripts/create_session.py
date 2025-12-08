@@ -13,10 +13,20 @@ for manually creating session files that the bot will use.
 """
 
 import argparse
+import logging
+import sys
 import time
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright
+
+# Setup simple logging for this standalone script
+logging.basicConfig(
+    level=logging.INFO,
+    format='[%(levelname)s] %(message)s',
+    stream=sys.stdout
+)
+logger = logging.getLogger(__name__)
 
 
 def wait_for_manual_login(page, timeout: int = 600) -> bool:
@@ -30,16 +40,16 @@ def wait_for_manual_login(page, timeout: int = 600) -> bool:
     Returns:
         True if login successful, False otherwise
     """
-    print("=" * 60)
-    print("MANUAL LOGIN REQUIRED")
-    print("=" * 60)
-    print("Please log in to ChatGPT in the browser window.")
-    print("The script will continue automatically once you're logged in.")
-    print()
-    print("Waiting for you to complete login...")
-    print(f"(You have up to {timeout // 60} minutes to complete the login)")
-    print("=" * 60)
-    print()
+    logger.info("=" * 60)
+    logger.info("MANUAL LOGIN REQUIRED")
+    logger.info("=" * 60)
+    logger.info("Please log in to ChatGPT in the browser window.")
+    logger.info("The script will continue automatically once you're logged in.")
+    logger.info("")
+    logger.info("Waiting for you to complete login...")
+    logger.info(f"(You have up to {timeout // 60} minutes to complete the login)")
+    logger.info("=" * 60)
+    logger.info("")
 
     start_time = time.time()
     check_interval = 2
@@ -49,7 +59,7 @@ def wait_for_manual_login(page, timeout: int = 600) -> bool:
         try:
             textarea = page.locator("#prompt-textarea")
             if textarea.count() > 0 and textarea.is_visible(timeout=1000):
-                print("Login successful! Chat interface detected.")
+                logger.info("Login successful! Chat interface detected.")
                 return True
         except Exception:
             pass
@@ -58,15 +68,15 @@ def wait_for_manual_login(page, timeout: int = 600) -> bool:
         try:
             login_button = page.locator('button:has-text("Log in"), a:has-text("Log in")').first
             if login_button.count() == 0:
-                print("Login detected (no login button present)")
+                logger.debug("Login detected (no login button present)")
                 page.wait_for_timeout(3000)
 
                 textarea = page.locator("#prompt-textarea")
                 if textarea.count() > 0:
-                    print("Chat interface ready")
+                    logger.info("Chat interface ready")
                     return True
                 else:
-                    print("Chat interface not ready yet, continuing to wait...")
+                    logger.debug("Chat interface not ready yet, continuing to wait...")
         except Exception:
             pass
 
@@ -81,15 +91,15 @@ def wait_for_manual_login(page, timeout: int = 600) -> bool:
             for selector in avatar_selectors:
                 avatar = page.locator(selector).first
                 if avatar.count() > 0 and avatar.is_visible(timeout=1000):
-                    print("Login detected (user profile visible)")
+                    logger.debug("Login detected (user profile visible)")
                     page.wait_for_timeout(3000)
 
                     textarea = page.locator("#prompt-textarea")
                     if textarea.count() > 0:
-                        print("Chat interface ready")
+                        logger.info("Chat interface ready")
                         return True
                     else:
-                        print("Chat interface not ready yet, continuing to wait...")
+                        logger.debug("Chat interface not ready yet, continuing to wait...")
                     break
         except Exception:
             pass
@@ -98,12 +108,12 @@ def wait_for_manual_login(page, timeout: int = 600) -> bool:
         elapsed = int(time.time() - start_time)
         if elapsed > 0 and elapsed % 10 == 0:
             remaining = timeout - elapsed
-            print(f"Still waiting... ({remaining}s remaining)")
+            logger.info(f"Still waiting... ({remaining}s remaining)")
 
         page.wait_for_timeout(check_interval * 1000)
 
-    print(f"Login timeout after {timeout} seconds")
-    print("The chat interface did not appear in time.")
+    logger.error(f"Login timeout after {timeout} seconds")
+    logger.error("The chat interface did not appear in time.")
     return False
 
 
@@ -119,26 +129,26 @@ def create_session(output_file: str) -> bool:
     """
     output_path = Path(output_file)
 
-    print("=" * 60)
-    print("ChatGPT Session Creator")
-    print("=" * 60)
-    print(f"Session will be saved to: {output_path}")
-    print()
+    logger.info("=" * 60)
+    logger.info("ChatGPT Session Creator")
+    logger.info("=" * 60)
+    logger.info(f"Session will be saved to: {output_path}")
+    logger.info("")
 
     # Check if session file already exists
     if output_path.exists():
-        print(f"Warning: Session file already exists: {output_path}")
+        logger.warning(f"Session file already exists: {output_path}")
         response = input("Do you want to overwrite it? (y/N): ")
         if response.lower() != 'y':
-            print("Cancelled.")
+            logger.info("Cancelled.")
             return False
-        print()
+        logger.info("")
 
     # Ensure parent directory exists
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Launch Playwright
-    print("Launching browser...")
+    logger.info("Launching browser...")
 
     with sync_playwright() as p:
         # Launch browser with anti-detection args
@@ -170,42 +180,42 @@ def create_session(output_file: str) -> bool:
 
         try:
             # Navigate to ChatGPT
-            print("Navigating to ChatGPT...")
+            logger.info("Navigating to ChatGPT...")
             page.goto("https://chatgpt.com/", timeout=60000)
             page.wait_for_load_state("domcontentloaded")
-            print("Page loaded")
-            print()
+            logger.info("Page loaded")
+            logger.info("")
 
             # Wait for manual login
             if not wait_for_manual_login(page):
-                print("Login failed or was cancelled")
+                logger.error("Login failed or was cancelled")
                 return False
 
-            print("Chat interface is ready")
+            logger.info("Chat interface is ready")
 
             # Save session to file
-            print()
-            print(f"Saving session to {output_path}...")
+            logger.info("")
+            logger.info(f"Saving session to {output_path}...")
             context.storage_state(path=str(output_path))
 
-            print()
-            print("=" * 60)
-            print("SUCCESS!")
-            print("=" * 60)
-            print(f"Session saved to: {output_path}")
-            print()
-            print("You can now use this session file with the main script:")
-            print(f"  uv run src/bot.py --sessions-dir {output_path.parent} --input prompts.csv")
-            print("=" * 60)
+            logger.info("")
+            logger.info("=" * 60)
+            logger.info("SUCCESS!")
+            logger.info("=" * 60)
+            logger.info(f"Session saved to: {output_path}")
+            logger.info("")
+            logger.info("You can now use this session file with the main script:")
+            logger.info(f"  uv run src/bot.py --sessions-dir {output_path.parent} --input prompts.csv")
+            logger.info("=" * 60)
 
             return True
 
         except Exception as e:
-            print(f"Error: {e}")
+            logger.error(f"Error: {e}")
             return False
 
         finally:
-            print("\nClosing browser...")
+            logger.info("\nClosing browser...")
             browser.close()
 
 
@@ -241,15 +251,15 @@ def main() -> int:
     """Main entry point."""
     args = parse_args()
 
-    print()
+    logger.info("")
     success = create_session(args.output)
-    print()
+    logger.info("")
 
     if success:
-        print("Session creation completed successfully!")
+        logger.info("Session creation completed successfully!")
         return 0
     else:
-        print("Session creation failed")
+        logger.error("Session creation failed")
         return 1
 
 
