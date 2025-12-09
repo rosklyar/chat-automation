@@ -232,3 +232,14 @@ class JsonResultPersister:
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         """Context manager exit."""
         self.close()
+
+
+# Export HTTP API persister
+from .http_api_result_persister import HttpApiResultPersister
+
+__all__ = [
+    'ResultPersister',
+    'JsonResultPersister',
+    'HttpApiResultPersister',
+    'PersistenceError'
+]

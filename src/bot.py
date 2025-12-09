@@ -26,7 +26,12 @@ from .prompt_provider import (
     HttpApiPromptProvider,
     ApiProviderError
 )
-from .result_persister import ResultPersister, JsonResultPersister
+from .result_persister import (
+    ResultPersister,
+    JsonResultPersister,
+    HttpApiResultPersister,
+    PersistenceError
+)
 from .logging_config import setup_logging
 from .shutdown_handler import ShutdownHandler
 
@@ -92,10 +97,30 @@ def create_argument_parser() -> argparse.ArgumentParser:
         default=1,
         help="Maximum attempts per prompt to get citations (default: 1)"
     )
-    parser.add_argument(
+
+    # Result output (mutually exclusive)
+    output_group = parser.add_mutually_exclusive_group(required=True)
+    output_group.add_argument(
         "-o", "--output",
-        default="chatgpt_results.json",
-        help="Path to output JSON file (default: chatgpt_results.json)"
+        help="Path to output JSON file"
+    )
+    output_group.add_argument(
+        "--results-api-url",
+        help="Base URL for HTTP API result submission (e.g., http://localhost:8000)"
+    )
+
+    # HTTP API result persister options
+    parser.add_argument(
+        "--submit-retry-attempts",
+        type=int,
+        default=3,
+        help="Max retry attempts for submitting results to API (default: 3)"
+    )
+    parser.add_argument(
+        "--submit-timeout",
+        type=float,
+        default=30.0,
+        help="API request timeout in seconds for result submission (default: 30.0)"
     )
     parser.add_argument(
         "--sessions-dir",
@@ -277,7 +302,12 @@ class Orchestrator:
 
         # Final failure - save empty result
         logger.error(f"✗ Failed to get citations for prompt {prompt.id}")
-        empty_result = EvaluationResult(response_text="", citations=[], success=False)
+        empty_result = EvaluationResult(
+            response_text="",
+            citations=[],
+            success=False,
+            error_message=f"No citations found after {self._max_attempts} attempts"
+        )
         self._result_persister.save(prompt, empty_result, run_number=0)
         return False
 
@@ -388,7 +418,30 @@ def main() -> None:
         return
 
     bot_factory = ChatGPTBotFactory()
-    result_persister = JsonResultPersister(args.output)
+
+    # Create result persister based on output type
+    result_persister: ResultPersister
+    try:
+        if args.output:
+            # JSON file output
+            result_persister = JsonResultPersister(args.output)
+        elif args.results_api_url:
+            # HTTP API output
+            result_persister = HttpApiResultPersister(
+                api_base_url=args.results_api_url,
+                submit_retry_attempts=args.submit_retry_attempts,
+                timeout_seconds=args.submit_timeout
+            )
+        else:
+            # Should never reach here due to mutually_exclusive_group
+            logger.error("No result output specified (use --output or --results-api-url)")
+            return
+    except (ValueError, PersistenceError) as e:
+        logger.error(f"Error initializing result persister: {e}")
+        return
+    except Exception as e:
+        logger.error(f"Unexpected error initializing result persister: {e}")
+        return
 
     # Run orchestration
     orchestrator = Orchestrator(
