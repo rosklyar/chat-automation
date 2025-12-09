@@ -20,7 +20,12 @@ from .models import Prompt, EvaluationResult
 from .session_provider import FileSessionProvider
 from .bot_interface import Bot
 from .chatgpt import ChatGPTBotFactory
-from .prompt_provider import PromptProvider, CsvPromptProvider
+from .prompt_provider import (
+    PromptProvider,
+    CsvPromptProvider,
+    HttpApiPromptProvider,
+    ApiProviderError
+)
 from .result_persister import ResultPersister, JsonResultPersister
 from .logging_config import setup_logging
 from .shutdown_handler import ShutdownHandler
@@ -33,15 +38,41 @@ def create_argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Automate ChatGPT interactions with continuous prompt polling"
     )
-    parser.add_argument(
+
+    # Prompt source (mutually exclusive)
+    source_group = parser.add_mutually_exclusive_group(required=True)
+    source_group.add_argument(
         "-i", "--input",
-        default="prompts.csv",
-        help="Path to input CSV file with prompts (default: prompts.csv)"
+        help="Path to input CSV file with prompts"
     )
+    source_group.add_argument(
+        "--api-url",
+        help="Base URL for HTTP API prompt source (e.g., http://localhost:8000)"
+    )
+
+    # CSV-specific options
     parser.add_argument(
         "--watch-csv",
         action="store_true",
-        help="Watch CSV file for new appends (continuous mode)"
+        help="Watch CSV file for new appends (continuous mode, CSV only)"
+    )
+
+    # API-specific options
+    parser.add_argument(
+        "--assistant-name",
+        default="ChatGPT",
+        help="Assistant name for API requests (default: ChatGPT)"
+    )
+    parser.add_argument(
+        "--plan-name",
+        default="Plus",
+        help="Plan name for API requests (default: Plus)"
+    )
+    parser.add_argument(
+        "--api-timeout",
+        type=float,
+        default=30.0,
+        help="API request timeout in seconds (default: 30.0)"
     )
     parser.add_argument(
         "--poll-retry-seconds",
@@ -313,18 +344,36 @@ def main() -> None:
     # Setup logging first
     setup_logging(level=args.log_level, log_file=args.log_file)
 
-    # Create prompt provider with watch mode
+    # Create prompt provider based on source type
+    prompt_provider: PromptProvider
     try:
-        prompt_provider = CsvPromptProvider(
-            csv_path=args.input,
-            watch_for_changes=args.watch_csv,
-            poll_interval_seconds=1.0
-        )
+        if args.input:
+            # CSV source
+            prompt_provider = CsvPromptProvider(
+                csv_path=args.input,
+                watch_for_changes=args.watch_csv,
+                poll_interval_seconds=1.0
+            )
+        elif args.api_url:
+            # API source
+            prompt_provider = HttpApiPromptProvider(
+                api_base_url=args.api_url,
+                assistant_name=args.assistant_name,
+                plan_name=args.plan_name,
+                timeout_seconds=args.api_timeout
+            )
+        else:
+            # Should never reach here due to mutually_exclusive_group
+            logger.error("No prompt source specified (use --input or --api-url)")
+            return
     except FileNotFoundError:
         logger.error(f"Input file not found: {args.input}")
         return
+    except (ValueError, ApiProviderError) as e:
+        logger.error(f"Error initializing prompt provider: {e}")
+        return
     except Exception as e:
-        logger.error(f"Error loading prompts: {e}")
+        logger.error(f"Unexpected error loading prompts: {e}")
         return
 
     # Initialize components

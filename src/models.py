@@ -57,3 +57,7 @@ class Prompt:
     """A prompt to be evaluated."""
     id: str
     text: str
+    # Optional API metadata (for HTTP API provider)
+    evaluation_id: Optional[int] = None
+    topic_id: Optional[int] = None
+    claimed_at: Optional[str] = None

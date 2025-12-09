@@ -199,6 +199,14 @@ class JsonResultPersister:
             if result.error_message:
                 answer['error_message'] = result.error_message
 
+            # Include API metadata if present (from HttpApiPromptProvider)
+            if prompt.evaluation_id is not None:
+                answer['evaluation_id'] = prompt.evaluation_id
+            if prompt.topic_id is not None:
+                answer['topic_id'] = prompt.topic_id
+            if prompt.claimed_at is not None:
+                answer['claimed_at'] = prompt.claimed_at
+
             entry['answers'].append(answer)
         else:
             # Empty result - just ensure entry exists (already done above)

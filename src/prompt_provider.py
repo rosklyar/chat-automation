@@ -219,3 +219,15 @@ class CsvPromptProvider:
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         """Context manager exit - cleanup resources."""
         self.close()
+
+
+# Export HTTP API provider
+from .http_api_prompt_provider import HttpApiPromptProvider, ApiProviderError
+
+__all__ = [
+    'PromptProvider',
+    'CsvPromptProvider',
+    'HttpApiPromptProvider',
+    'PromptParseError',
+    'ApiProviderError'
+]
