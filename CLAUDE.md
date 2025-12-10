@@ -19,17 +19,16 @@ This project automates interactions with the ChatGPT web application using Playw
 mkdir sessions
 uv run scripts/create_session.py --output sessions/account1.json
 
-# Run the main application with saved sessions (batch mode)
-uv run src/bot.py --sessions-dir sessions --input prompts.csv --max-attempts 3
-
-# Run in continuous mode (watches CSV for new prompts)
+# Run the main application with HTTP API endpoints
 uv run src/bot.py \
   --sessions-dir sessions \
-  --input prompts.csv \
-  --watch-csv \
+  --api-url http://localhost:8000 \
+  --results-api-url http://localhost:8000 \
+  --assistant-name ChatGPT \
+  --plan-name Plus \
+  --max-attempts 3 \
   --poll-retry-seconds 10 \
-  --idle-timeout-minutes 30 \
-  --max-attempts 3
+  --idle-timeout-minutes 30
 
 # Run tests
 uv run pytest
@@ -55,8 +54,8 @@ chat-automation/
         models.py                  # Data classes (SessionType, Citation, EvaluationResult, etc.)
         session_provider.py        # SessionProvider protocol + FileSessionProvider
         bot_interface.py           # Bot protocol definition
-        prompt_provider.py         # PromptProvider protocol + CsvPromptProvider
-        result_persister.py        # ResultPersister protocol + JsonResultPersister
+        prompt_provider.py         # PromptProvider protocol + HttpApiPromptProvider
+        result_persister.py        # ResultPersister protocol + HttpApiResultPersister
         shutdown_handler.py        # Graceful shutdown handling
         logging_config.py          # Logging configuration
         bot.py                     # Main orchestration (Orchestrator class)
@@ -91,18 +90,41 @@ Implementation of Bot protocol for ChatGPT web automation.
 - Extracts citations from responses
 
 ### PromptProvider
-Protocol for sourcing prompts from various sources (CSV, Kafka, APIs).
+Protocol for sourcing prompts from various sources.
 - `poll() -> Optional[Prompt]` - Get next prompt if available
 - `is_exhausted` property - Check if source has no more prompts
-- `close()` - Release resources (files, connections)
-- **CsvPromptProvider**: Reads from CSV files, supports file watching (tail -f style) in continuous mode
+- `close()` - Release resources (connections)
+
+**HttpApiPromptProvider** (Primary Implementation):
+- **Endpoint**: POST `/evaluations/api/v1/poll`
+- **Request Format**: `{"assistant_name": "ChatGPT", "plan_name": "Plus"}`
+- **Response Format** (prompt available): `{"evaluation_id": 123, "prompt_id": 456, "prompt_text": "...", "topic_id": 1, "claimed_at": "..."}`
+- **Response Format** (no prompts): All fields are `null`
+- **Never exhausts**: `is_exhausted` always returns `False` (continuous polling)
+- **Retry Logic**: Retries on timeouts and 5xx errors (default: 3 attempts), no retry on 4xx
+- **Configuration**: Timeout (default: 30s), retry attempts, retry delay
 
 ### ResultPersister
 Protocol for persisting evaluation results to various backends.
 - `save(prompt, result, run_number)` - Persist a single evaluation result
 - `output_location` property - Human-readable description of storage location
 - `close()` - Ensure all data is persisted and release resources
-- **JsonResultPersister**: Stores results in JSON files, groups by prompt_id
+
+**HttpApiResultPersister** (Primary Implementation):
+- **Success Path** (run_number > 0):
+  - **Endpoint**: POST `/evaluations/api/v1/submit`
+  - **Request**: `{"evaluation_id": 123, "answer": {"response": "...", "citations": [...], "timestamp": "..."}}`
+  - **Response**: `{"evaluation_id": 123, "status": "submitted"}`
+  - **Retry Logic**: Retries on timeouts and 5xx errors (default: 3 attempts), no retry on 4xx
+
+- **Failure Path** (run_number == 0):
+  - **Endpoint**: POST `/evaluations/api/v1/release`
+  - **Request**: `{"evaluation_id": 123, "mark_as_failed": true, "failure_reason": "No citations after 3 attempts"}`
+  - **Response**: `{"evaluation_id": 123, "action": "released"}`
+  - **Retry Logic**: Best-effort only (no retries), non-critical failure
+
+- **Backward Compatibility**: Skips API submission if prompt lacks `evaluation_id` (CSV mode compatibility)
+- **Configuration**: Submit retry attempts, timeout, retry delay
 
 ### ShutdownHandler
 Manages graceful shutdown for long-running processes.
@@ -135,22 +157,31 @@ The bot uses session rotation mode - provide a directory with session files.
 # Try up to 3 times per prompt to get citations
 # --per-session-runs 10 means each session handles 10 attempts before switching
 
-uv run src/bot.py --sessions-dir ./sessions --input prompts.csv --max-attempts 3 --per-session-runs 10
+uv run src/bot.py \
+  --sessions-dir ./sessions \
+  --api-url http://localhost:8000 \
+  --results-api-url http://localhost:8000 \
+  --assistant-name ChatGPT \
+  --plan-name Plus \
+  --max-attempts 3 \
+  --per-session-runs 10
 ```
 
 **How it works:**
+- Polls HTTP API endpoint for prompts continuously
 - For each prompt, tries up to `--max-attempts` times to get an answer with citations
 - If no citations after max attempts, switches to a new session and tries once more
-- If still no citations, saves empty response and moves to next prompt
+- If still no citations, releases evaluation as failed via API
 - Sessions rotate automatically after `--per-session-runs` attempts
 
 **Key Parameters:**
 - `--sessions-dir PATH` - Directory containing session .json files (required)
+- `--api-url URL` - Base URL for HTTP API prompt source (required)
+- `--results-api-url URL` - Base URL for HTTP API result submission (required)
+- `--assistant-name NAME` - Assistant name for API requests (default: ChatGPT)
+- `--plan-name NAME` - Plan name for API requests (default: Plus)
 - `--max-attempts N` - Maximum attempts to get citations per prompt (default: 1)
 - `--per-session-runs N` - Number of attempts per session before switching (default: 10)
-- `-i, --input` - Input CSV file with prompts (default: prompts.csv)
-- `-o, --output` - Output JSON file (default: chatgpt_results.json)
-- `--watch-csv` - Watch CSV file for new appends (continuous mode)
 - `--poll-retry-seconds N` - Seconds to wait when no prompts available (default: 5.0)
 - `--idle-timeout-minutes N` - Close browser after N minutes of inactivity (default: never)
 
@@ -161,37 +192,37 @@ uv run src/bot.py --sessions-dir ./sessions --input prompts.csv --max-attempts 3
 - Round-robin cycling - Sessions reused indefinitely
 - Clean separation - Session management decoupled from bot logic
 
-## Operating Modes
+## Operating Mode
 
-### Batch Mode (Default)
-Process all prompts from CSV once and exit.
-
-```bash
-uv run src/bot.py --sessions-dir sessions --input prompts.csv --max-attempts 3
-```
-
-- Reads entire CSV at startup
-- Processes each prompt sequentially
-- Exits when all prompts completed
-- Use when you have a fixed list of prompts
-
-### Continuous Mode (--watch-csv)
-Run indefinitely, polling for new prompts.
+### HTTP API Polling Mode
+The bot runs continuously, polling the HTTP API for new prompts. This is the primary and only supported operating mode.
 
 ```bash
 uv run src/bot.py \
   --sessions-dir sessions \
-  --input prompts.csv \
-  --watch-csv \
+  --api-url http://localhost:8000 \
+  --results-api-url http://localhost:8000 \
+  --assistant-name ChatGPT \
+  --plan-name Plus \
   --poll-retry-seconds 10 \
-  --idle-timeout-minutes 30
+  --idle-timeout-minutes 30 \
+  --max-attempts 3
 ```
 
-- Watches CSV file for appends (tail -f style)
-- Polls continuously, waiting when no prompts available
-- Closes browser during idle periods to save resources
+**How it works:**
+- Polls HTTP API endpoint continuously for new prompts
+- Returns None when no prompts available (non-blocking)
+- Waits `--poll-retry-seconds` before retrying when queue is empty
+- Closes browser after `--idle-timeout-minutes` of inactivity to save resources
 - Press Ctrl+C for graceful shutdown
-- Ideal for integration with prompt schedulers and Kafka consumers (future)
+- Never exhausts - `is_exhausted` always returns False
+
+**Troubleshooting API Connectivity:**
+- **Connection refused**: Verify API service is running and `--api-url` is correct
+- **Timeout errors**: Increase `--api-timeout` or check network latency
+- **401/403 errors**: Check API authentication configuration (if applicable)
+- **500 errors**: Check backend API service logs for internal errors
+- **No prompts returned**: Verify prompts exist in backend database and match `assistant_name`/`plan_name` filters
 
 ## Architecture
 

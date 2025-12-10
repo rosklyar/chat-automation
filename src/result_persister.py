@@ -1,9 +1,12 @@
 """Result persistence protocol and implementations."""
 
-import json
 import logging
-from pathlib import Path
+import sys
+import time
 from typing import Optional, Protocol, runtime_checkable
+
+import requests
+from requests.exceptions import RequestException, Timeout, HTTPError
 
 from .models import Prompt, EvaluationResult
 
@@ -91,83 +94,63 @@ class ResultPersister(Protocol):
         ...
 
 
-class JsonResultPersister:
+class HttpApiResultPersister:
     """
-    Persists evaluation results to a JSON file.
+    Persists evaluation results by submitting to HTTP API endpoints.
 
-    Output format groups results by prompt:
-    [
-        {
-            "prompt_id": "1",
-            "prompt": "...",
-            "answers": [
-                {
-                    "run_number": 1,
-                    "response": "...",
-                    "citations": [{"url": "...", "text": "..."}],
-                    "timestamp": "...",
-                    "success": true,
-                    "error_message": null
-                }
-            ]
-        }
-    ]
+    Successful evaluations are submitted to POST /evaluations/api/v1/submit.
+    Failed evaluations are released via POST /evaluations/api/v1/release.
 
-    Features:
-    - Loads existing file on init for resume capability
-    - Writes eagerly after each save() for durability
-    - Groups multiple results under same prompt
+    For API-based workflows where prompts are claimed atomically from an
+    evaluation service, this persister completes the loop by reporting results
+    back to the service.
     """
 
-    def __init__(self, output_path: str | Path) -> None:
+    def __init__(
+        self,
+        api_base_url: str,
+        submit_retry_attempts: int = 3,
+        timeout_seconds: float = 30.0,
+        retry_delay_seconds: float = 1.0
+    ) -> None:
         """
-        Initialize the JSON result persister.
+        Initialize HTTP API result persister.
 
         Args:
-            output_path: Path to output JSON file. Created if doesn't exist.
-                        Existing data is loaded for resume capability.
+            api_base_url: Base API URL (e.g., "http://localhost:8000")
+            submit_retry_attempts: Max retry attempts for submit endpoint
+            timeout_seconds: Request timeout in seconds
+            retry_delay_seconds: Delay between retries
+
+        Raises:
+            ValueError: If api_base_url is invalid or empty
         """
-        self._output_path = Path(output_path)
-        self._data: list[dict] = self._load_existing()
+        # Validate inputs
+        if not api_base_url or not api_base_url.strip():
+            raise ValueError("api_base_url cannot be empty")
+
+        # Normalize URL (remove trailing slash)
+        self._api_base_url = api_base_url.rstrip('/')
+        self._submit_endpoint = f"{self._api_base_url}/evaluations/api/v1/submit"
+        self._release_endpoint = f"{self._api_base_url}/evaluations/api/v1/release"
+
+        self._submit_retry_attempts = submit_retry_attempts
+        self._timeout = timeout_seconds
+        self._retry_delay = retry_delay_seconds
+
+        # Create persistent session for connection pooling
+        self._session = requests.Session()
+        self._session.headers.update({
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        })
+
         self._closed = False
 
-    def _load_existing(self) -> list[dict]:
-        """Load existing results if file exists (resume capability)."""
-        if self._output_path.exists():
-            try:
-                with open(self._output_path, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    logger.info(f"Loaded {len(data)} existing entries from {self._output_path}")
-                    return data
-            except (json.JSONDecodeError, IOError) as e:
-                logger.warning(f"Could not load existing file: {e}")
-                return []
-        return []
-
-    def _find_or_create_entry(self, prompt: Prompt) -> dict:
-        """Find existing prompt entry or create new one."""
-        for entry in self._data:
-            if entry.get('prompt_id') == prompt.id:
-                return entry
-
-        entry = {
-            'prompt_id': prompt.id,
-            'prompt': prompt.text,
-            'answers': [],
-        }
-        self._data.append(entry)
-        return entry
-
-    def _write_to_disk(self) -> None:
-        """Write data to file (eager persistence)."""
-        try:
-            # Ensure parent directory exists
-            self._output_path.parent.mkdir(parents=True, exist_ok=True)
-
-            with open(self._output_path, 'w', encoding='utf-8') as f:
-                json.dump(self._data, f, ensure_ascii=False, indent=2)
-        except IOError as e:
-            raise PersistenceError(f"Failed to write to {self._output_path}", cause=e)
+        logger.info(
+            f"Initialized HTTP API result persister: {self._api_base_url} "
+            f"(submit_retries={submit_retry_attempts})"
+        )
 
     def save(
         self,
@@ -176,51 +159,265 @@ class JsonResultPersister:
         run_number: int
     ) -> None:
         """
-        Persist an evaluation result to JSON file.
+        Persist evaluation result to API.
 
-        Empty results (run_number=0) create the prompt entry with empty answers.
-        Non-empty results are appended to the prompt's answers array.
+        For successful evaluations (run_number > 0), submits answer to API.
+        For failed evaluations (run_number == 0), releases evaluation as failed.
+
+        If prompt is missing evaluation_id (e.g., from CSV provider),
+        logs warning and skips API submission.
+
+        Args:
+            prompt: The prompt that was evaluated
+            result: The evaluation outcome
+            run_number: Which attempt produced this result (0 = failure)
+
+        Raises:
+            PersistenceError: If API submission fails persistently
         """
         if self._closed:
             raise PersistenceError("Cannot save to closed persister")
 
-        entry = self._find_or_create_entry(prompt)
+        # Check if prompt has evaluation_id (required for API submission)
+        if prompt.evaluation_id is None:
+            logger.warning(
+                f"Skipping API submission for prompt {prompt.id}: "
+                f"missing evaluation_id (prompt source may be CSV)"
+            )
+            return
 
-        # Only add to answers if this is a real result (run_number > 0)
-        if run_number > 0:
-            answer = {
-                'run_number': run_number,
-                'response': result.response_text,
-                'citations': [c.to_dict() for c in result.citations],
-                'timestamp': result.timestamp.isoformat(),
-                'success': result.success,
+        try:
+            if run_number > 0:
+                # Success case: submit answer
+                self._submit_answer(prompt, result)
+                logger.info(
+                    f"Submitted answer for evaluation_id={prompt.evaluation_id}, "
+                    f"prompt_id={prompt.id}"
+                )
+            else:
+                # Failure case: release evaluation
+                self._release_evaluation(prompt, result)
+                logger.info(
+                    f"Released failed evaluation_id={prompt.evaluation_id}, "
+                    f"prompt_id={prompt.id}"
+                )
+        except PersistenceError:
+            # Re-raise our own errors
+            raise
+        except Exception as e:
+            # Wrap unexpected errors
+            raise PersistenceError(
+                f"Unexpected error persisting result for evaluation_id={prompt.evaluation_id}",
+                cause=e
+            )
+
+    def _submit_answer(self, prompt: Prompt, result: EvaluationResult) -> None:
+        """
+        Submit successful evaluation to /evaluations/api/v1/submit.
+
+        Retries on transient failures (timeouts, 5xx errors, network errors).
+        Does not retry on 4xx client errors.
+
+        Args:
+            prompt: The prompt with evaluation_id
+            result: The successful evaluation result
+
+        Raises:
+            PersistenceError: If submission fails after retries
+        """
+        request_body = {
+            "evaluation_id": prompt.evaluation_id,
+            "answer": {
+                "response": result.response_text,
+                "citations": [c.to_dict() for c in result.citations],
+                "timestamp": result.timestamp.isoformat()
             }
-            # Only include error_message if present
-            if result.error_message:
-                answer['error_message'] = result.error_message
+        }
 
-            entry['answers'].append(answer)
-        else:
-            # Empty result - just ensure entry exists (already done above)
-            logger.warning(f"Saving empty result for prompt {prompt.id}")
+        # Retry logic for transient failures
+        for attempt in range(1, self._submit_retry_attempts + 1):
+            try:
+                response = self._session.post(
+                    self._submit_endpoint,
+                    json=request_body,
+                    timeout=self._timeout
+                )
 
-        self._write_to_disk()
+                # Check HTTP status
+                response.raise_for_status()
+
+                # Parse response - catch JSON errors
+                try:
+                    data = response.json()
+                except ValueError as e:
+                    logger.error(f"Invalid API response format (invalid JSON): {e}")
+                    raise PersistenceError(
+                        f"API returned malformed response: {e}",
+                        cause=e
+                    )
+
+                logger.debug(
+                    f"Submit successful: evaluation_id={data.get('evaluation_id')}, "
+                    f"status={data.get('status')}"
+                )
+                return
+
+            except PersistenceError:
+                # Re-raise our own errors
+                raise
+
+            except Timeout:
+                logger.warning(
+                    f"Submit timeout (attempt {attempt}/{self._submit_retry_attempts}): "
+                    f"evaluation_id={prompt.evaluation_id}"
+                )
+                if attempt < self._submit_retry_attempts:
+                    time.sleep(self._retry_delay)
+                    continue
+                raise PersistenceError(
+                    f"Submit timed out after {self._submit_retry_attempts} attempts",
+                    cause=sys.exc_info()[1]
+                )
+
+            except HTTPError as e:
+                # 4xx/5xx errors
+                status_code = e.response.status_code if hasattr(e, 'response') and e.response else None
+
+                # If we can't get status code from exception, try to parse from message
+                if status_code is None and hasattr(e, 'args') and e.args:
+                    try:
+                        msg = str(e.args[0])
+                        if msg and msg[0:3].isdigit():
+                            status_code = int(msg[0:3])
+                    except (ValueError, IndexError):
+                        pass
+
+                logger.error(
+                    f"Submit HTTP error {status_code}: {e}"
+                )
+
+                # Don't retry 4xx client errors
+                if status_code and 400 <= status_code < 500:
+                    raise PersistenceError(
+                        f"API rejected submit request (HTTP {status_code})",
+                        cause=e
+                    )
+
+                # Retry 5xx server errors
+                if attempt < self._submit_retry_attempts:
+                    logger.warning(f"Retrying submit after server error (attempt {attempt})")
+                    time.sleep(self._retry_delay)
+                    continue
+                raise PersistenceError(
+                    f"Submit failed with server error after {self._submit_retry_attempts} attempts",
+                    cause=e
+                )
+
+            except RequestException as e:
+                # Network errors, connection errors
+                logger.warning(
+                    f"Submit network error (attempt {attempt}/{self._submit_retry_attempts}): {e}"
+                )
+                if attempt < self._submit_retry_attempts:
+                    time.sleep(self._retry_delay)
+                    continue
+                raise PersistenceError(
+                    f"Submit failed with network error after {self._submit_retry_attempts} attempts",
+                    cause=e
+                )
+
+    def _release_evaluation(self, prompt: Prompt, result: EvaluationResult) -> None:
+        """
+        Release failed evaluation to /evaluations/api/v1/release.
+
+        Always uses mark_as_failed=true to preserve evaluation for analytics.
+        Does not retry - this is best-effort cleanup.
+
+        Args:
+            prompt: The prompt with evaluation_id
+            result: The failed evaluation result (should have error_message)
+
+        Raises:
+            PersistenceError: If release fails
+        """
+        # Get failure reason from result's error_message, or use default
+        failure_reason = result.error_message or "Evaluation failed without specific reason"
+
+        request_body = {
+            "evaluation_id": prompt.evaluation_id,
+            "mark_as_failed": True,
+            "failure_reason": failure_reason
+        }
+
+        try:
+            response = self._session.post(
+                self._release_endpoint,
+                json=request_body,
+                timeout=self._timeout
+            )
+
+            # Check HTTP status
+            response.raise_for_status()
+
+            # Parse response
+            try:
+                data = response.json()
+            except ValueError as e:
+                logger.warning(f"Release response malformed (non-critical): {e}")
+                return  # Best-effort - don't fail
+
+            logger.debug(
+                f"Release successful: evaluation_id={data.get('evaluation_id')}, "
+                f"action={data.get('action')}"
+            )
+
+        except Timeout as e:
+            # Best-effort - log but don't fail
+            logger.warning(
+                f"Release timeout for evaluation_id={prompt.evaluation_id} "
+                f"(non-critical): {e}"
+            )
+
+        except HTTPError as e:
+            status_code = e.response.status_code if hasattr(e, 'response') and e.response else None
+            logger.warning(
+                f"Release HTTP error {status_code} for evaluation_id={prompt.evaluation_id} "
+                f"(non-critical): {e}"
+            )
+
+        except RequestException as e:
+            logger.warning(
+                f"Release network error for evaluation_id={prompt.evaluation_id} "
+                f"(non-critical): {e}"
+            )
 
     def close(self) -> None:
-        """Release resources. Safe to call multiple times."""
+        """
+        Release HTTP session resources.
+
+        Safe to call multiple times. After close(), save() will raise.
+        """
         if not self._closed:
+            self._session.close()
             self._closed = True
-            logger.debug(f"Closed JSON persister for {self._output_path}")
+            logger.debug("Closed HTTP API result persister session")
 
     @property
     def output_location(self) -> str:
-        """Return the output file path as string."""
-        return str(self._output_path)
+        """Return the API base URL as string."""
+        return self._api_base_url
 
-    def __enter__(self) -> "JsonResultPersister":
+    def __enter__(self) -> "HttpApiResultPersister":
         """Context manager entry."""
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
-        """Context manager exit."""
+        """Context manager exit - cleanup resources."""
         self.close()
+
+
+__all__ = [
+    'ResultPersister',
+    'HttpApiResultPersister',
+    'PersistenceError'
+]

@@ -1,9 +1,12 @@
 """Prompt provider abstraction for sourcing prompts from various sources."""
 
-import csv
 import logging
-from pathlib import Path
+import sys
+import time
 from typing import Optional, Protocol, runtime_checkable
+
+import requests
+from requests.exceptions import RequestException, Timeout, HTTPError
 
 from .models import Prompt
 
@@ -13,6 +16,21 @@ logger = logging.getLogger(__name__)
 class PromptParseError(Exception):
     """Raised when prompt source data is malformed or invalid."""
     pass
+
+
+class ApiProviderError(Exception):
+    """Raised when API provider encounters errors."""
+
+    def __init__(self, message: str, cause: Optional[Exception] = None) -> None:
+        """
+        Initialize API provider error.
+
+        Args:
+            message: Error description
+            cause: Original exception that caused this error (if any)
+        """
+        super().__init__(message)
+        self.cause = cause
 
 
 @runtime_checkable
@@ -56,166 +74,258 @@ class PromptProvider(Protocol):
         ...
 
 
-class CsvPromptProvider:
+class HttpApiPromptProvider:
     """
-    Provides prompts by reading from a CSV file.
+    Provides prompts by polling an HTTP API endpoint.
 
-    Supports two modes:
-    - Batch mode (default): Load all rows, return None when exhausted
-    - Watch mode: Monitor file for new appends (tail -f style)
+    Continuously polls POST /evaluations/api/v1/poll endpoint.
+    Returns None when no prompts available (non-blocking).
+    Never exhausts - is_exhausted always returns False.
 
-    The CSV file must have columns: id, prompt
+    Request format:
+        {"assistant_name": "ChatGPT", "plan_name": "Plus"}
+
+    Response format (prompt available):
+        {
+            "evaluation_id": 123,
+            "prompt_id": 456,
+            "prompt_text": "...",
+            "topic_id": 1,
+            "claimed_at": "2025-12-09T10:30:00Z"
+        }
+
+    Response format (no prompts):
+        {
+            "evaluation_id": null,
+            "prompt_id": null,
+            "prompt_text": null,
+            "topic_id": null,
+            "claimed_at": null
+        }
     """
 
     def __init__(
         self,
-        csv_path: str | Path,
-        watch_for_changes: bool = False,
-        poll_interval_seconds: float = 1.0
+        api_base_url: str,
+        assistant_name: str,
+        plan_name: str,
+        timeout_seconds: float = 30.0,
+        retry_attempts: int = 3,
+        retry_delay_seconds: float = 1.0
     ) -> None:
         """
-        Initialize the CSV prompt provider.
+        Initialize HTTP API prompt provider.
 
         Args:
-            csv_path: Path to CSV file with columns: id, prompt
-            watch_for_changes: If True, monitor file for new rows (continuous mode)
-            poll_interval_seconds: How often to check for new rows when watching
+            api_base_url: Base API URL (e.g., "https://api.example.com")
+            assistant_name: Assistant name for requests (e.g., "ChatGPT")
+            plan_name: Plan name for requests (e.g., "Plus")
+            timeout_seconds: Request timeout in seconds
+            retry_attempts: Max attempts for transient failures
+            retry_delay_seconds: Delay between retries
 
         Raises:
-            FileNotFoundError: If CSV file does not exist.
-            PromptParseError: If CSV is malformed or missing required columns.
+            ValueError: If api_base_url is invalid or empty
         """
-        self._csv_path = Path(csv_path)
-        self._watch_for_changes = watch_for_changes
-        self._poll_interval = poll_interval_seconds
-        self._prompts: list[Prompt] = []
-        self._current_index = 0
-        self._file_size = 0  # Track file size to detect appends
-        self._load_prompts()
+        # Validate inputs
+        if not api_base_url or not api_base_url.strip():
+            raise ValueError("api_base_url cannot be empty")
 
-    def _load_prompts(self) -> None:
-        """Load all prompts from CSV file (initial load)."""
-        if not self._csv_path.exists():
-            raise FileNotFoundError(f"CSV file not found: {self._csv_path}")
+        if not assistant_name or not plan_name:
+            raise ValueError("assistant_name and plan_name are required")
 
-        try:
-            stat = self._csv_path.stat()
-            self._file_size = stat.st_size
+        # Normalize URL (remove trailing slash)
+        self._api_base_url = api_base_url.rstrip('/')
+        self._poll_endpoint = f"{self._api_base_url}/evaluations/api/v1/poll"
 
-            with open(self._csv_path, 'r', encoding='utf-8') as f:
-                reader = csv.DictReader(f)
+        self._assistant_name = assistant_name
+        self._plan_name = plan_name
+        self._timeout = timeout_seconds
+        self._retry_attempts = retry_attempts
+        self._retry_delay = retry_delay_seconds
 
-                # Validate required columns
-                if reader.fieldnames is None:
-                    raise PromptParseError(f"CSV file is empty: {self._csv_path}")
+        # Create persistent session for connection pooling
+        self._session = requests.Session()
+        self._session.headers.update({
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        })
 
-                if 'id' not in reader.fieldnames or 'prompt' not in reader.fieldnames:
-                    raise PromptParseError(
-                        f"CSV must have 'id' and 'prompt' columns. "
-                        f"Found: {reader.fieldnames}"
-                    )
+        self._closed = False
 
-                # Load all prompts
-                for row_num, row in enumerate(reader, start=2):  # Start at 2 (1 is header)
-                    try:
-                        self._prompts.append(Prompt(id=row['id'], text=row['prompt']))
-                    except KeyError as e:
-                        raise PromptParseError(
-                            f"Missing column in row {row_num}: {e}"
-                        )
-
-            logger.info(f"Loaded {len(self._prompts)} prompts from {self._csv_path}")
-
-        except csv.Error as e:
-            raise PromptParseError(f"Error parsing CSV file: {e}")
-
-    def _check_for_new_rows(self) -> None:
-        """Check if file has grown and load new rows (watch mode only)."""
-        if not self._watch_for_changes:
-            return
-
-        try:
-            stat = self._csv_path.stat()
-            current_size = stat.st_size
-
-            # File hasn't grown
-            if current_size <= self._file_size:
-                return
-
-            # File grew - read new rows
-            with open(self._csv_path, 'r', encoding='utf-8') as f:
-                reader = csv.DictReader(f)
-
-                # Skip rows we've already read
-                existing_count = len(self._prompts)
-                for i, row in enumerate(reader):
-                    if i < existing_count:
-                        continue
-
-                    # New row found
-                    try:
-                        prompt = Prompt(id=row['id'], text=row['prompt'])
-                        self._prompts.append(prompt)
-                        logger.info(f"Detected new prompt in CSV: {prompt.id}")
-                    except KeyError as e:
-                        logger.warning(f"Skipping malformed new row: {e}")
-
-            self._file_size = current_size
-
-        except (FileNotFoundError, IOError) as e:
-            logger.warning(f"Error checking for new rows: {e}")
+        logger.info(
+            f"Initialized HTTP API provider: {self._poll_endpoint} "
+            f"(assistant={assistant_name}, plan={plan_name})"
+        )
 
     def poll(self) -> Optional[Prompt]:
         """
-        Get the next prompt from CSV.
+        Poll API for next prompt.
 
-        In watch mode, returns None temporarily if no more rows,
-        but future calls may return data if file is appended to.
+        Makes POST request to /evaluations/api/v1/poll with assistant/plan info.
+        Retries transient failures automatically.
 
         Returns:
-            Next prompt if available, None if no data currently available.
+            Prompt with evaluation metadata if available, None if no prompts queued.
+
+        Raises:
+            ApiProviderError: If API returns error or persistent failures occur
         """
-        # Check for new appends if in watch mode
-        if self._watch_for_changes:
-            self._check_for_new_rows()
+        if self._closed:
+            raise ApiProviderError("Cannot poll from closed provider")
 
-        # Return next prompt if available
-        if self._current_index < len(self._prompts):
-            prompt = self._prompts[self._current_index]
-            self._current_index += 1
-            return prompt
+        request_body = {
+            "assistant_name": self._assistant_name,
+            "plan_name": self._plan_name
+        }
 
-        # No more prompts
-        return None
+        # Retry logic for transient failures
+        for attempt in range(1, self._retry_attempts + 1):
+            try:
+                response = self._session.post(
+                    self._poll_endpoint,
+                    json=request_body,
+                    timeout=self._timeout
+                )
+
+                # Check HTTP status
+                response.raise_for_status()
+
+                # Parse response - catch JSON errors before other exceptions
+                try:
+                    data = response.json()
+                except ValueError as e:
+                    # JSON decode errors
+                    logger.error(f"Invalid API response format (invalid JSON): {e}")
+                    raise ApiProviderError(
+                        f"API returned malformed response: {e}",
+                        cause=e
+                    )
+
+                # Validate required fields exist
+                if 'prompt_id' not in data or 'prompt_text' not in data:
+                    logger.error("API response missing required fields (prompt_id, prompt_text)")
+                    raise ApiProviderError(
+                        "API returned malformed response: missing required fields"
+                    )
+
+                # Check if response has prompt (non-null fields)
+                if data.get('prompt_id') is None:
+                    # Empty response - no prompts available
+                    logger.debug("API returned no prompts (empty response)")
+                    return None
+
+                # Valid prompt received
+                prompt = Prompt(
+                    id=str(data['prompt_id']),
+                    text=data['prompt_text'],
+                    evaluation_id=data.get('evaluation_id'),
+                    topic_id=data.get('topic_id'),
+                    claimed_at=data.get('claimed_at')
+                )
+
+                logger.info(
+                    f"Received prompt from API: id={prompt.id}, "
+                    f"evaluation_id={prompt.evaluation_id}"
+                )
+                return prompt
+
+            except Timeout:
+                logger.warning(
+                    f"Request timeout (attempt {attempt}/{self._retry_attempts}): "
+                    f"{self._poll_endpoint}"
+                )
+                if attempt < self._retry_attempts:
+                    time.sleep(self._retry_delay)
+                    continue
+                raise ApiProviderError(
+                    f"API request timed out after {self._retry_attempts} attempts",
+                    cause=sys.exc_info()[1]
+                )
+
+            except ApiProviderError:
+                # Re-raise our own errors (from JSON parsing or validation)
+                raise
+
+            except HTTPError as e:
+                # 4xx/5xx errors
+                status_code = e.response.status_code if hasattr(e, 'response') and e.response else None
+
+                # If we can't get status code from exception, try to parse from message
+                if status_code is None and hasattr(e, 'args') and e.args:
+                    # Try to extract status from error message (e.g., "400 Client Error: ...")
+                    try:
+                        msg = str(e.args[0])
+                        if msg and msg[0:3].isdigit():
+                            status_code = int(msg[0:3])
+                    except (ValueError, IndexError):
+                        pass
+
+                logger.error(
+                    f"HTTP error {status_code}: {e}"
+                )
+                # Don't retry 4xx client errors (bad request, auth, etc)
+                if status_code and 400 <= status_code < 500:
+                    raise ApiProviderError(
+                        f"API rejected request (HTTP {status_code})",
+                        cause=e
+                    )
+                # Retry 5xx server errors
+                if attempt < self._retry_attempts:
+                    logger.warning(f"Retrying after server error (attempt {attempt})")
+                    time.sleep(self._retry_delay)
+                    continue
+                raise ApiProviderError(
+                    f"API server error after {self._retry_attempts} attempts",
+                    cause=e
+                )
+
+            except RequestException as e:
+                # Network errors, connection errors
+                logger.warning(
+                    f"Network error (attempt {attempt}/{self._retry_attempts}): {e}"
+                )
+                if attempt < self._retry_attempts:
+                    time.sleep(self._retry_delay)
+                    continue
+                raise ApiProviderError(
+                    f"Network error after {self._retry_attempts} attempts",
+                    cause=e
+                )
 
     @property
     def is_exhausted(self) -> bool:
         """
-        Check if all prompts have been consumed.
+        Check if provider has no more prompts.
 
-        Returns:
-            True if no more prompts available, False otherwise.
+        For API provider, always returns False (continuous polling).
+        When no prompts available, poll() returns None temporarily.
         """
-        return self._current_index >= len(self._prompts)
-
-    @property
-    def total_count(self) -> int:
-        """Get total number of prompts loaded from CSV."""
-        return len(self._prompts)
-
-    @property
-    def remaining_count(self) -> int:
-        """Get number of prompts not yet consumed."""
-        return max(0, len(self._prompts) - self._current_index)
+        return False
 
     def close(self) -> None:
-        """Release resources (no-op for CSV provider)."""
-        pass
+        """
+        Release HTTP session resources.
 
-    def __enter__(self) -> "CsvPromptProvider":
+        Safe to call multiple times. After close(), poll() will raise.
+        """
+        if not self._closed:
+            self._session.close()
+            self._closed = True
+            logger.debug("Closed HTTP API provider session")
+
+    def __enter__(self) -> "HttpApiPromptProvider":
         """Context manager entry."""
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         """Context manager exit - cleanup resources."""
         self.close()
+
+
+__all__ = [
+    'PromptProvider',
+    'HttpApiPromptProvider',
+    'PromptParseError',
+    'ApiProviderError'
+]
