@@ -217,8 +217,13 @@ The bot integrates with the backend API service using a continuous polling mecha
   }
   ```
 
-### How it runs as a Docker image and can be scaled
+### How it works together with [prompts-volume](https://github.com/rosklyar/prompts-volume)
+#### Run prompts-volume
+https://github.com/user-attachments/assets/bb5a9092-b767-4347-8a78-1587f652b985
+#### Run automation bot
+https://github.com/user-attachments/assets/1d13c621-ee50-4ffb-b97d-5accc1384e2b
 
+### Dockerized bot demo
 https://github.com/user-attachments/assets/a09b8bb0-af95-4ee1-aa93-09c393372a1a
 
 ## Quick Reference
