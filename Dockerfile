@@ -31,11 +31,14 @@ RUN apt-get update && apt-get install -y \
 # Set working directory
 WORKDIR /app
 
-# Copy Python dependencies file
-COPY pyproject.toml ./
+# Install uv for dependency management
+RUN pip install --no-cache-dir uv
 
-# Install Python dependencies
-RUN pip install --no-cache-dir playwright
+# Copy Python dependencies files
+COPY pyproject.toml uv.lock ./
+
+# Install all Python dependencies using uv
+RUN uv pip install --system -r pyproject.toml
 
 # Install Playwright Chromium browser
 RUN playwright install chromium --with-deps

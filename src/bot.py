@@ -245,12 +245,11 @@ class Orchestrator:
             if not self._ensure_bot_ready():
                 continue
 
-            # For subsequent attempts, start new conversation
-            if attempt > 1:
-                if not self._bot.start_new_conversation():
-                    logger.warning("Failed to start new conversation, retrying with fresh browser")
-                    self._reset_bot()
-                    continue
+            # Start fresh conversation for EVERY evaluation attempt
+            if not self._bot.start_new_conversation():
+                logger.warning("Failed to start new conversation, retrying with fresh browser")
+                self._reset_bot()
+                continue
 
             # Evaluate prompt
             result = self._bot.evaluate(prompt.text)
@@ -273,15 +272,19 @@ class Orchestrator:
         self._reset_bot()
 
         if self._ensure_bot_ready():
-            result = self._bot.evaluate(prompt.text)
-            recorded = self._session_provider.record_evaluation()
-            if recorded.rotated:
-                self._reset_bot()
+            # Start fresh conversation for final attempt
+            if not self._bot.start_new_conversation():
+                logger.warning("Failed to start new conversation for final retry")
+            else:
+                result = self._bot.evaluate(prompt.text)
+                recorded = self._session_provider.record_evaluation()
+                if recorded.rotated:
+                    self._reset_bot()
 
-            if result.has_citations:
-                logger.info(f"✓ Got citations with fresh session")
-                self._result_persister.save(prompt, result, 1)
-                return True
+                if result.has_citations:
+                    logger.info(f"✓ Got citations with fresh session")
+                    self._result_persister.save(prompt, result, 1)
+                    return True
 
         # Final failure - save empty result
         logger.error(f"✗ Failed to get citations for prompt {prompt.id}")

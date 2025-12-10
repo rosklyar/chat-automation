@@ -94,14 +94,37 @@ Protocol for sourcing prompts from various sources.
 - `poll() -> Optional[Prompt]` - Get next prompt if available
 - `is_exhausted` property - Check if source has no more prompts
 - `close()` - Release resources (connections)
-- **HttpApiPromptProvider**: Polls HTTP API endpoint for prompts, supports continuous polling
+
+**HttpApiPromptProvider** (Primary Implementation):
+- **Endpoint**: POST `/evaluations/api/v1/poll`
+- **Request Format**: `{"assistant_name": "ChatGPT", "plan_name": "Plus"}`
+- **Response Format** (prompt available): `{"evaluation_id": 123, "prompt_id": 456, "prompt_text": "...", "topic_id": 1, "claimed_at": "..."}`
+- **Response Format** (no prompts): All fields are `null`
+- **Never exhausts**: `is_exhausted` always returns `False` (continuous polling)
+- **Retry Logic**: Retries on timeouts and 5xx errors (default: 3 attempts), no retry on 4xx
+- **Configuration**: Timeout (default: 30s), retry attempts, retry delay
 
 ### ResultPersister
 Protocol for persisting evaluation results to various backends.
 - `save(prompt, result, run_number)` - Persist a single evaluation result
 - `output_location` property - Human-readable description of storage location
 - `close()` - Ensure all data is persisted and release resources
-- **HttpApiResultPersister**: Submits results to HTTP API endpoints (submit for success, release for failures)
+
+**HttpApiResultPersister** (Primary Implementation):
+- **Success Path** (run_number > 0):
+  - **Endpoint**: POST `/evaluations/api/v1/submit`
+  - **Request**: `{"evaluation_id": 123, "answer": {"response": "...", "citations": [...], "timestamp": "..."}}`
+  - **Response**: `{"evaluation_id": 123, "status": "submitted"}`
+  - **Retry Logic**: Retries on timeouts and 5xx errors (default: 3 attempts), no retry on 4xx
+
+- **Failure Path** (run_number == 0):
+  - **Endpoint**: POST `/evaluations/api/v1/release`
+  - **Request**: `{"evaluation_id": 123, "mark_as_failed": true, "failure_reason": "No citations after 3 attempts"}`
+  - **Response**: `{"evaluation_id": 123, "action": "released"}`
+  - **Retry Logic**: Best-effort only (no retries), non-critical failure
+
+- **Backward Compatibility**: Skips API submission if prompt lacks `evaluation_id` (CSV mode compatibility)
+- **Configuration**: Submit retry attempts, timeout, retry delay
 
 ### ShutdownHandler
 Manages graceful shutdown for long-running processes.
@@ -171,8 +194,8 @@ uv run src/bot.py \
 
 ## Operating Mode
 
-### Continuous API Polling
-The bot runs continuously, polling the HTTP API for new prompts.
+### HTTP API Polling Mode
+The bot runs continuously, polling the HTTP API for new prompts. This is the primary and only supported operating mode.
 
 ```bash
 uv run src/bot.py \
@@ -193,6 +216,13 @@ uv run src/bot.py \
 - Closes browser after `--idle-timeout-minutes` of inactivity to save resources
 - Press Ctrl+C for graceful shutdown
 - Never exhausts - `is_exhausted` always returns False
+
+**Troubleshooting API Connectivity:**
+- **Connection refused**: Verify API service is running and `--api-url` is correct
+- **Timeout errors**: Increase `--api-timeout` or check network latency
+- **401/403 errors**: Check API authentication configuration (if applicable)
+- **500 errors**: Check backend API service logs for internal errors
+- **No prompts returned**: Verify prompts exist in backend database and match `assistant_name`/`plan_name` filters
 
 ## Architecture
 
