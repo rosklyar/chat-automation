@@ -10,12 +10,13 @@ from .bot_interface import Bot, BotFactory
 from .chatgpt import ChatGPTBot, ChatGPTBotFactory
 from .prompt_provider import (
     PromptProvider,
-    CsvPromptProvider,
+    HttpApiPromptProvider,
     PromptParseError,
+    ApiProviderError,
 )
 from .result_persister import (
     ResultPersister,
-    JsonResultPersister,
+    HttpApiResultPersister,
     PersistenceError,
 )
 from .shutdown_handler import ShutdownHandler
@@ -36,11 +37,12 @@ __all__ = [
     "ChatGPTBotFactory",
     # Prompt Provider
     "PromptProvider",
-    "CsvPromptProvider",
+    "HttpApiPromptProvider",
     "PromptParseError",
+    "ApiProviderError",
     # Result Persister
     "ResultPersister",
-    "JsonResultPersister",
+    "HttpApiResultPersister",
     "PersistenceError",
     # Shutdown Handler
     "ShutdownHandler",

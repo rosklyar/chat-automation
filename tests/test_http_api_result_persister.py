@@ -7,8 +7,7 @@ from datetime import datetime
 from requests.exceptions import Timeout, ConnectionError
 
 from src.models import Prompt, EvaluationResult, Citation
-from src.http_api_result_persister import HttpApiResultPersister
-from src.result_persister import PersistenceError
+from src.result_persister import HttpApiResultPersister, PersistenceError
 
 
 class TestHttpApiResultPersister:

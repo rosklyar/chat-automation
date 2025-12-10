@@ -22,13 +22,11 @@ from .bot_interface import Bot
 from .chatgpt import ChatGPTBotFactory
 from .prompt_provider import (
     PromptProvider,
-    CsvPromptProvider,
     HttpApiPromptProvider,
     ApiProviderError
 )
 from .result_persister import (
     ResultPersister,
-    JsonResultPersister,
     HttpApiResultPersister,
     PersistenceError
 )
@@ -44,22 +42,11 @@ def create_argument_parser() -> argparse.ArgumentParser:
         description="Automate ChatGPT interactions with continuous prompt polling"
     )
 
-    # Prompt source (mutually exclusive)
-    source_group = parser.add_mutually_exclusive_group(required=True)
-    source_group.add_argument(
-        "-i", "--input",
-        help="Path to input CSV file with prompts"
-    )
-    source_group.add_argument(
-        "--api-url",
-        help="Base URL for HTTP API prompt source (e.g., http://localhost:8000)"
-    )
-
-    # CSV-specific options
+    # Prompt source (HTTP API only)
     parser.add_argument(
-        "--watch-csv",
-        action="store_true",
-        help="Watch CSV file for new appends (continuous mode, CSV only)"
+        "--api-url",
+        required=True,
+        help="Base URL for HTTP API prompt source (e.g., http://localhost:8000)"
     )
 
     # API-specific options
@@ -98,14 +85,10 @@ def create_argument_parser() -> argparse.ArgumentParser:
         help="Maximum attempts per prompt to get citations (default: 1)"
     )
 
-    # Result output (mutually exclusive)
-    output_group = parser.add_mutually_exclusive_group(required=True)
-    output_group.add_argument(
-        "-o", "--output",
-        help="Path to output JSON file"
-    )
-    output_group.add_argument(
+    # Result output (HTTP API only)
+    parser.add_argument(
         "--results-api-url",
+        required=True,
         help="Base URL for HTTP API result submission (e.g., http://localhost:8000)"
     )
 
@@ -374,31 +357,15 @@ def main() -> None:
     # Setup logging first
     setup_logging(level=args.log_level, log_file=args.log_file)
 
-    # Create prompt provider based on source type
+    # Create HTTP API prompt provider
     prompt_provider: PromptProvider
     try:
-        if args.input:
-            # CSV source
-            prompt_provider = CsvPromptProvider(
-                csv_path=args.input,
-                watch_for_changes=args.watch_csv,
-                poll_interval_seconds=1.0
-            )
-        elif args.api_url:
-            # API source
-            prompt_provider = HttpApiPromptProvider(
-                api_base_url=args.api_url,
-                assistant_name=args.assistant_name,
-                plan_name=args.plan_name,
-                timeout_seconds=args.api_timeout
-            )
-        else:
-            # Should never reach here due to mutually_exclusive_group
-            logger.error("No prompt source specified (use --input or --api-url)")
-            return
-    except FileNotFoundError:
-        logger.error(f"Input file not found: {args.input}")
-        return
+        prompt_provider = HttpApiPromptProvider(
+            api_base_url=args.api_url,
+            assistant_name=args.assistant_name,
+            plan_name=args.plan_name,
+            timeout_seconds=args.api_timeout
+        )
     except (ValueError, ApiProviderError) as e:
         logger.error(f"Error initializing prompt provider: {e}")
         return
@@ -419,23 +386,14 @@ def main() -> None:
 
     bot_factory = ChatGPTBotFactory()
 
-    # Create result persister based on output type
+    # Create HTTP API result persister
     result_persister: ResultPersister
     try:
-        if args.output:
-            # JSON file output
-            result_persister = JsonResultPersister(args.output)
-        elif args.results_api_url:
-            # HTTP API output
-            result_persister = HttpApiResultPersister(
-                api_base_url=args.results_api_url,
-                submit_retry_attempts=args.submit_retry_attempts,
-                timeout_seconds=args.submit_timeout
-            )
-        else:
-            # Should never reach here due to mutually_exclusive_group
-            logger.error("No result output specified (use --output or --results-api-url)")
-            return
+        result_persister = HttpApiResultPersister(
+            api_base_url=args.results_api_url,
+            submit_retry_attempts=args.submit_retry_attempts,
+            timeout_seconds=args.submit_timeout
+        )
     except (ValueError, PersistenceError) as e:
         logger.error(f"Error initializing result persister: {e}")
         return

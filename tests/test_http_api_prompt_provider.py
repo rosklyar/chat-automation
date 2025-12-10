@@ -6,7 +6,7 @@ import responses
 from requests.exceptions import Timeout, ConnectionError
 
 from src.models import Prompt
-from src.http_api_prompt_provider import HttpApiPromptProvider, ApiProviderError
+from src.prompt_provider import HttpApiPromptProvider, ApiProviderError
 
 
 class TestHttpApiPromptProvider:
