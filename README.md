@@ -242,7 +242,7 @@ uv run src/bot.py \
   --api-url http://localhost:8000 \
   --results-api-url http://localhost:8000 \
   --assistant-name ChatGPT \
-  --plan-name Plus \
+  --plan-name Free \
   --max-attempts 3 \
   --poll-retry-seconds 10 \
   --idle-timeout-minutes 30

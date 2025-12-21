@@ -36,6 +36,32 @@ from .shutdown_handler import ShutdownHandler
 logger = logging.getLogger(__name__)
 
 
+def _has_valid_response(result: EvaluationResult) -> bool:
+    """Check if result contains a valid, submittable response."""
+    return result.success and bool(result.response_text.strip())
+
+
+def _is_better_result(
+    new_result: EvaluationResult,
+    current_best: Optional[EvaluationResult]
+) -> bool:
+    """
+    Determine if new_result should replace current_best.
+
+    Priority: has_citations > has_valid_response > nothing
+    """
+    if current_best is None:
+        return True
+
+    if new_result.has_citations and not current_best.has_citations:
+        return True
+
+    if _has_valid_response(new_result) and not _has_valid_response(current_best):
+        return True
+
+    return False
+
+
 def create_argument_parser() -> argparse.ArgumentParser:
     """Create CLI argument parser."""
     parser = argparse.ArgumentParser(
@@ -234,12 +260,20 @@ class Orchestrator:
         """
         Process a single prompt with retry logic.
 
+        Tries up to max_attempts times to get a response with citations.
+        Tracks the best result seen (preferring citations over no citations).
+        Submits the best available result at the end.
+
         Args:
             prompt: The prompt to evaluate.
 
         Returns:
-            True if citation was found, False otherwise.
+            True if a valid response was obtained, False if complete failure.
         """
+        best_result: Optional[EvaluationResult] = None
+        best_attempt: int = 0
+
+        # Main retry loop - try to get citations
         for attempt in range(1, self._max_attempts + 1):
             # Ensure bot is ready
             if not self._ensure_bot_ready():
@@ -254,19 +288,24 @@ class Orchestrator:
             # Evaluate prompt
             result = self._bot.evaluate(prompt.text)
 
+            # Track best result seen so far
+            if _is_better_result(result, best_result):
+                best_result = result
+                best_attempt = attempt
+
             # Record evaluation - CHECK FOR EAGER ROTATION
             recorded = self._session_provider.record_evaluation()
             if recorded.rotated:
                 logger.info("Session exhausted, resetting browser")
                 self._reset_bot()
 
-            # Check for citations
+            # If we got citations, we're done - submit immediately
             if result.has_citations:
-                logger.info(f"✓ Got {len(result.citations)} citations")
+                logger.info(f"✓ Got {len(result.citations)} citations on attempt {attempt}")
                 self._result_persister.save(prompt, result, attempt)
                 return True
 
-        # All attempts exhausted - try ONCE with fresh session (manual fallback)
+        # All attempts exhausted without citations - try ONCE with fresh session
         logger.info("Switching to fresh session for final retry")
         self._session_provider.force_rotate()
         self._reset_bot()
@@ -277,22 +316,37 @@ class Orchestrator:
                 logger.warning("Failed to start new conversation for final retry")
             else:
                 result = self._bot.evaluate(prompt.text)
+
+                # Track if this is better
+                if _is_better_result(result, best_result):
+                    best_result = result
+                    best_attempt = self._max_attempts + 1  # Fresh session attempt
+
                 recorded = self._session_provider.record_evaluation()
                 if recorded.rotated:
                     self._reset_bot()
 
                 if result.has_citations:
-                    logger.info(f"✓ Got citations with fresh session")
+                    logger.info("✓ Got citations with fresh session")
                     self._result_persister.save(prompt, result, 1)
                     return True
 
-        # Final failure - save empty result
-        logger.error(f"✗ Failed to get citations for prompt {prompt.id}")
+        # No citations found - check if we have ANY valid response
+        if best_result is not None and _has_valid_response(best_result):
+            # Submit the best response we have (without citations)
+            logger.info(
+                f"No citations found, but submitting valid response from attempt {best_attempt}"
+            )
+            self._result_persister.save(prompt, best_result, best_attempt)
+            return True
+
+        # Complete failure - no valid response obtained
+        logger.error(f"✗ Failed to get any valid response for prompt {prompt.id}")
         empty_result = EvaluationResult(
             response_text="",
             citations=[],
             success=False,
-            error_message=f"No citations found after {self._max_attempts} attempts"
+            error_message=f"No valid response after {self._max_attempts} attempts"
         )
         self._result_persister.save(prompt, empty_result, run_number=0)
         return False
