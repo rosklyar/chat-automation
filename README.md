@@ -13,7 +13,7 @@ This platform provides a scalable service for retrieving answers from multiple A
 
 ## Overall Architecture
 
-![Architecture Diagram](architecture.png)
+![Architecture Diagram](arhitecture.png)
 
 ## ChatGPT Bot (Current Implementation)
 
