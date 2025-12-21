@@ -19,7 +19,7 @@ This project automates interactions with the ChatGPT web application using Playw
 mkdir sessions
 uv run scripts/create_session.py --output sessions/account1.json
 
-# Run the main application with HTTP API endpoints
+# Run the main application with HTTP API endpoints (local development)
 uv run src/bot.py \
   --sessions-dir sessions \
   --api-url http://localhost:8000 \
@@ -42,6 +42,36 @@ uv add --dev <package-name>
 # Sync dependencies
 uv sync
 ```
+
+**Docker Configuration**: When running in Docker, use environment variables via `.env` file instead of CLI arguments. See `.env.example` for configuration template.
+
+## Docker Configuration
+
+When running in Docker containers, configure via environment variables:
+
+```bash
+# Copy and edit .env file
+cp .env.example .env
+
+# Edit .env with your configuration
+# Required settings:
+API_URL=http://your-backend-api:8000
+RESULTS_API_URL=http://your-backend-api:8000
+
+# Optional settings (defaults shown):
+SESSIONS_DIR=/app/sessions
+ASSISTANT_NAME=ChatGPT
+PLAN_NAME=Plus
+MAX_ATTEMPTS=3
+PER_SESSION_RUNS=10
+POLL_RETRY_SECONDS=10
+IDLE_TIMEOUT_MINUTES=30
+
+# Then run with docker
+docker run --env-file .env -v ./sessions:/app/sessions:ro chatgpt-automation
+```
+
+The `entrypoint.sh` script automatically converts environment variables to CLI arguments.
 
 ## Project Structure
 
@@ -175,15 +205,17 @@ uv run src/bot.py \
 - Sessions rotate automatically after `--per-session-runs` attempts
 
 **Key Parameters:**
-- `--sessions-dir PATH` - Directory containing session .json files (required)
-- `--api-url URL` - Base URL for HTTP API prompt source (required)
-- `--results-api-url URL` - Base URL for HTTP API result submission (required)
-- `--assistant-name NAME` - Assistant name for API requests (default: ChatGPT)
-- `--plan-name NAME` - Plan name for API requests (default: Plus)
-- `--max-attempts N` - Maximum attempts to get citations per prompt (default: 1)
-- `--per-session-runs N` - Number of attempts per session before switching (default: 10)
-- `--poll-retry-seconds N` - Seconds to wait when no prompts available (default: 5.0)
-- `--idle-timeout-minutes N` - Close browser after N minutes of inactivity (default: never)
+- `--sessions-dir PATH` (env: `SESSIONS_DIR`) - Directory containing session .json files (required)
+- `--api-url URL` (env: `API_URL`) - Base URL for HTTP API prompt source (required)
+- `--results-api-url URL` (env: `RESULTS_API_URL`) - Base URL for HTTP API result submission (required)
+- `--assistant-name NAME` (env: `ASSISTANT_NAME`) - Assistant name for API requests (default: ChatGPT)
+- `--plan-name NAME` (env: `PLAN_NAME`) - Plan name for API requests (default: Plus)
+- `--max-attempts N` (env: `MAX_ATTEMPTS`) - Maximum attempts to get citations per prompt (default: 1)
+- `--per-session-runs N` (env: `PER_SESSION_RUNS`) - Number of attempts per session before switching (default: 10)
+- `--poll-retry-seconds N` (env: `POLL_RETRY_SECONDS`) - Seconds to wait when no prompts available (default: 5.0)
+- `--idle-timeout-minutes N` (env: `IDLE_TIMEOUT_MINUTES`) - Close browser after N minutes of inactivity (default: never)
+
+**Note:** For Docker deployments, use environment variables via `.env` file. For local development, use CLI arguments.
 
 ### Benefits
 
