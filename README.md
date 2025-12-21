@@ -5,53 +5,15 @@
 This platform provides a scalable service for retrieving answers from multiple AI assistants (ChatGPT, Claude, Google AI Overview, Perplexity).
 
 
-- Prompts submitted to the system via Kafka. Now implemented simpler approach with polling service API by automation-bot.
+- Prompts are evaluating using native-browser bots based on Playwright.
 - Platform provides answers instantly for prompts which are already in db(which means were executed before).
 - Platform suggests user to use prompts which are similar to requested, for which we already have data.
-- New prompts(no similarity >= 0.95 in db) are automatically scheduled for execution across AI assistants. Answers is going to be served as soon as they ready with a callback.
+- If user brings new prompts inside system we evaluate them with priority and add for periodic execution to our db.
 - Answers are stored and become available for future requests.
 
 ## Overall Architecture
 
-![Architecture Diagram](ai-assistants-answers-arch.png)
-
-### Main Flows
-
-1. **Session Creation Flow**
-   - Backoffice operator creates logins to AI-assistant with created credentials → `session-creation-frontend` → `chat-session-provider` → PostgreSQL (`sessions-db`)
-   - Creates and stores authenticated session files for automation bots
-
-2. **Answer Request Flow**
-   - Customer → `answers-provider` → PostgreSQL + pgvector (`prompts-db` + `llm-answers-db`)
-   - Searches for similar prompts (similarity > 0.95) and returns cached answers instantly if user agreed to use similar
-   - Returns existing answers and notifies when answers for new prompts are ready
-
-3. **Automation Flow**
-   - `prompts-scheduler` → Kafka (`prompts-tasks`) → `automation-bot` instances (scalable)
-   - prompts-scheduler reads prompts which were requested by any client and creates tasks as kafka messages which contains all needed info for automation-bot to evaluate answers
-   - Bots get sessions from `chat-session-provider` according to specific info in prompts-tasks(for example target account preferences)
-   - Bots execute prompts and produce results to Kafka (`llm-answers`)
-   - `kafka-connector-for-postgres` writes answers to PostgreSQL (`llm-answers-db`) with prompt_id foreign key
-
-### Technologies
-
-- **Frontend**: Session creation UI: React
-- **Backend Services**: Python-based microservices (chat-session-provider, answers-provider, prompts-scheduler)
-- **Databases**: PostgreSQL (sessions as json), PostgreSQL + pgvector (vector similarity search for prompts)
-- **Message Queue**: Apache Kafka (prompts-tasks, llm-answers topics)
-- **Automation**: Playwright-based bots running in Docker containers
-- **Data Integration**: Kafka Connect for PostgreSQL
-
-### Microservices
-
-| Service | Purpose |
-|---------|---------|
-| `session-creation-frontend` | UI for creating authenticated sessions |
-| `chat-session-provider` | Manages and provides bot session files |
-| `answers-provider` | Searches cached answers using vector similarity |
-| `prompts-scheduler` | Schedules prompt execution tasks to Kafka |
-| `automation-bot` | Scalable workers that execute prompts on AI assistants |
-| `kafka-connector-for-postgres` | Syncs Kafka messages to PostgreSQL |
+![Architecture Diagram](architecture.png)
 
 ## ChatGPT Bot (Current Implementation)
 
@@ -66,6 +28,33 @@ The ChatGPT automation bot is fully implemented and uses:
 ```bash
 docker build -t chatgpt-automation .
 ```
+
+### Environment Configuration
+
+For Docker deployments, configure the bot using environment variables:
+
+**1. Copy the example environment file:**
+```bash
+cp .env.example .env
+```
+
+**2. Edit `.env` with your configuration:**
+```bash
+# Required settings
+API_URL=http://your-backend-api:8000
+RESULTS_API_URL=http://your-backend-api:8000
+
+# Optional settings (defaults shown)
+SESSIONS_DIR=/app/sessions
+ASSISTANT_NAME=ChatGPT
+PLAN_NAME=Plus
+MAX_ATTEMPTS=3
+PER_SESSION_RUNS=10
+POLL_RETRY_SECONDS=10
+IDLE_TIMEOUT_MINUTES=30
+```
+
+**Note:** The `.env` file is git-ignored to prevent committing sensitive configuration.
 
 ### Run with Docker
 
@@ -84,22 +73,35 @@ uv run scripts/create_session.py --output sessions/account3.json
 
 **Run in HTTP API polling mode (continuous operation):**
 
+**Approach 1: Using .env file (Recommended)**
 ```bash
 docker run --rm \
   --shm-size=2gb \
   --security-opt seccomp:unconfined \
+  --env-file .env \
   -v $(pwd)/sessions:/app/sessions:ro \
-  chatgpt-automation \
-  --sessions-dir /app/sessions \
-  --api-url http://your-backend-api:8000 \
-  --results-api-url http://your-backend-api:8000 \
-  --assistant-name ChatGPT \
-  --plan-name Plus \
-  --max-attempts 3 \
-  --per-session-runs 10 \
-  --poll-retry-seconds 10 \
-  --idle-timeout-minutes 30
+  chatgpt-automation
 ```
+
+**Approach 2: Using individual environment variables**
+```bash
+docker run --rm \
+  --shm-size=2gb \
+  --security-opt seccomp:unconfined \
+  -e API_URL=http://your-backend-api:8000 \
+  -e RESULTS_API_URL=http://your-backend-api:8000 \
+  -e SESSIONS_DIR=/app/sessions \
+  -e ASSISTANT_NAME=ChatGPT \
+  -e PLAN_NAME=Plus \
+  -e MAX_ATTEMPTS=3 \
+  -e PER_SESSION_RUNS=10 \
+  -e POLL_RETRY_SECONDS=10 \
+  -e IDLE_TIMEOUT_MINUTES=30 \
+  -v $(pwd)/sessions:/app/sessions:ro \
+  chatgpt-automation
+```
+
+**Note:** Any additional CLI arguments passed to the container will override environment variable settings.
 
 **How it works:**
 
@@ -245,7 +247,7 @@ uv run src/bot.py \
   --api-url http://localhost:8000 \
   --results-api-url http://localhost:8000 \
   --assistant-name ChatGPT \
-  --plan-name Plus \
+  --plan-name Free \
   --max-attempts 3 \
   --poll-retry-seconds 10 \
   --idle-timeout-minutes 30
@@ -264,19 +266,23 @@ uv run pytest
 
 ### Application Arguments
 
-| Argument | Purpose | Example | Required |
-|----------|---------|---------|----------|
-| `--api-url` | Base URL for HTTP API prompt source | `http://localhost:8000` | **Yes** |
-| `--results-api-url` | Base URL for HTTP API result submission | `http://localhost:8000` | **Yes** |
-| `--sessions-dir` | Directory with session files | `/app/sessions` | **Yes** |
-| `--assistant-name` | Assistant name for API requests | `ChatGPT` | No (default: `ChatGPT`) |
-| `--plan-name` | Plan name for API requests | `Plus` | No (default: `Plus`) |
-| `--max-attempts` | Max attempts to get citations per prompt | `3` | No (default: `1`) |
-| `--per-session-runs` | Evaluations per session before rotation | `10` | No (default: `10`) |
-| `--poll-retry-seconds` | Seconds to wait when no prompts available | `10` | No (default: `5.0`) |
-| `--idle-timeout-minutes` | Close browser after N minutes of inactivity | `30` | No (default: never) |
-| `--api-timeout` | API request timeout in seconds | `30.0` | No (default: `30.0`) |
-| `--submit-retry-attempts` | Max retry attempts for submitting results | `3` | No (default: `3`) |
-| `--submit-timeout` | Result submission timeout in seconds | `30.0` | No (default: `30.0`) |
-| `--log-level` | Logging level | `INFO` | No (default: `INFO`) |
-| `--log-file` | Optional log file path | `/app/logs/bot.log` | No (default: console only) |
+| Argument | Environment Variable | Purpose | Example | Required |
+|----------|---------------------|---------|---------|----------|
+| `--api-url` | `API_URL` | Base URL for HTTP API prompt source | `http://localhost:8000` | **Yes** |
+| `--results-api-url` | `RESULTS_API_URL` | Base URL for HTTP API result submission | `http://localhost:8000` | **Yes** |
+| `--sessions-dir` | `SESSIONS_DIR` | Directory with session files | `/app/sessions` | **Yes** |
+| `--assistant-name` | `ASSISTANT_NAME` | Assistant name for API requests | `ChatGPT` | No (default: `ChatGPT`) |
+| `--plan-name` | `PLAN_NAME` | Plan name for API requests | `Plus` | No (default: `Plus`) |
+| `--max-attempts` | `MAX_ATTEMPTS` | Max attempts to get citations per prompt | `3` | No (default: `1`) |
+| `--per-session-runs` | `PER_SESSION_RUNS` | Evaluations per session before rotation | `10` | No (default: `10`) |
+| `--poll-retry-seconds` | `POLL_RETRY_SECONDS` | Seconds to wait when no prompts available | `10` | No (default: `5.0`) |
+| `--idle-timeout-minutes` | `IDLE_TIMEOUT_MINUTES` | Close browser after N minutes of inactivity | `30` | No (default: never) |
+| `--api-timeout` | `API_TIMEOUT` | API request timeout in seconds | `30.0` | No (default: `30.0`) |
+| `--submit-retry-attempts` | `SUBMIT_RETRY_ATTEMPTS` | Max retry attempts for submitting results | `3` | No (default: `3`) |
+| `--submit-timeout` | `SUBMIT_TIMEOUT` | Result submission timeout in seconds | `30.0` | No (default: `30.0`) |
+| `--log-level` | `LOG_LEVEL` | Logging level | `INFO` | No (default: `INFO`) |
+| `--log-file` | `LOG_FILE` | Optional log file path | `/app/logs/bot.log` | No (default: console only) |
+
+**Configuration Methods:**
+- **Docker**: Use environment variables via `.env` file (recommended) or `-e` flags. The `entrypoint.sh` script converts them to CLI arguments.
+- **Local Development**: Use CLI arguments directly with `uv run src/bot.py`.
