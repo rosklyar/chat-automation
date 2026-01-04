@@ -112,7 +112,7 @@ class HttpApiResultPersister:
         bot_secret: str,
         submit_retry_attempts: int = 3,
         timeout_seconds: float = 30.0,
-        retry_delay_seconds: float = 1.0
+        retry_delay_seconds: float = 5.0
     ) -> None:
         """
         Initialize HTTP API result persister.

@@ -249,8 +249,6 @@ uv run python -m src.bot \
   --assistant-name ChatGPT \
   --plan-name Free \
   --max-attempts 3 \
-  --poll-retry-seconds 10 \
-  --idle-timeout-minutes 30 \
   --bot-secret supersecret
 
 # Run tests

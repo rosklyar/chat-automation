@@ -2,7 +2,25 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from enum import Enum, auto
 from typing import Optional
+
+
+class PollingState(Enum):
+    """State of the polling loop."""
+    ACTIVE = auto()           # Processing prompts
+    IDLE_NO_PROMPTS = auto()  # API reachable but queue empty
+    DISCONNECTED = auto()     # API unreachable
+
+
+@dataclass
+class PollingConfig:
+    """Configuration for polling backoff behavior."""
+    base_interval: float = 5.0          # Starting interval (seconds)
+    max_interval: float = 300.0         # Maximum interval (5 min cap)
+    backoff_multiplier: float = 2.0     # Exponential growth factor
+    api_error_interval: float = 300.0   # Fixed interval for API errors (5 min)
+    browser_close_threshold: float = 60.0  # Close browser when wait > this
 
 
 @dataclass(frozen=True)

@@ -23,12 +23,13 @@ CMD="$CMD --assistant-name ${ASSISTANT_NAME:-ChatGPT}"
 CMD="$CMD --plan-name ${PLAN_NAME:-Plus}"
 CMD="$CMD --max-attempts ${MAX_ATTEMPTS:-3}"
 CMD="$CMD --per-session-runs ${PER_SESSION_RUNS:-10}"
-CMD="$CMD --poll-retry-seconds ${POLL_RETRY_SECONDS:-10}"
 
-# Only add idle-timeout if set (optional parameter)
-if [ -n "${IDLE_TIMEOUT_MINUTES}" ]; then
-  CMD="$CMD --idle-timeout-minutes ${IDLE_TIMEOUT_MINUTES}"
-fi
+# Polling backoff configuration
+CMD="$CMD --poll-base-interval ${POLL_BASE_INTERVAL:-5}"
+CMD="$CMD --poll-max-interval ${POLL_MAX_INTERVAL:-300}"
+CMD="$CMD --poll-backoff-multiplier ${POLL_BACKOFF_MULTIPLIER:-2.0}"
+CMD="$CMD --api-error-retry-interval ${API_ERROR_RETRY_INTERVAL:-300}"
+CMD="$CMD --browser-close-threshold ${BROWSER_CLOSE_THRESHOLD:-60}"
 
 # Bot secret is required for API authentication
 CMD="$CMD --bot-secret ${BOT_SECRET:?BOT_SECRET environment variable is required}"
