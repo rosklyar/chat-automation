@@ -28,31 +28,38 @@ class TestHttpApiResultPersister:
         """Release endpoint URL."""
         return f"{base_url}/evaluations/api/v1/release"
 
-    def test_initialization_success(self, base_url: str):
+    @pytest.fixture
+    def bot_secret(self) -> str:
+        """Bot secret for API authentication."""
+        return "test-secret-123"
+
+    def test_initialization_success(self, base_url: str, bot_secret: str):
         """Test successful initialization with valid parameters."""
         persister = HttpApiResultPersister(
             api_base_url=base_url,
-            submit_retry_attempts=3
+            submit_retry_attempts=3,
+            bot_secret=bot_secret
         )
         assert persister._submit_endpoint == f"{base_url}/evaluations/api/v1/submit"
         assert persister._release_endpoint == f"{base_url}/evaluations/api/v1/release"
         assert persister._submit_retry_attempts == 3
 
-    def test_initialization_removes_trailing_slash(self):
+    def test_initialization_removes_trailing_slash(self, bot_secret: str):
         """Test that trailing slash is removed from base URL."""
         persister = HttpApiResultPersister(
-            api_base_url="https://api.example.com/"
+            api_base_url="https://api.example.com/",
+            bot_secret=bot_secret
         )
         assert persister._api_base_url == "https://api.example.com"
         assert persister._submit_endpoint == "https://api.example.com/evaluations/api/v1/submit"
 
-    def test_initialization_with_empty_url(self):
+    def test_initialization_with_empty_url(self, bot_secret: str):
         """Test initialization fails with empty URL."""
         with pytest.raises(ValueError, match="cannot be empty"):
-            HttpApiResultPersister(api_base_url="")
+            HttpApiResultPersister(api_base_url="", bot_secret=bot_secret)
 
     @responses.activate
-    def test_submit_answer_success(self, base_url: str, submit_url: str):
+    def test_submit_answer_success(self, base_url: str, submit_url: str, bot_secret: str):
         """Test successful answer submission."""
         responses.post(
             submit_url,
@@ -65,7 +72,7 @@ class TestHttpApiResultPersister:
             status=200
         )
 
-        persister = HttpApiResultPersister(base_url)
+        persister = HttpApiResultPersister(base_url, bot_secret=bot_secret)
         prompt = Prompt(
             id="456",
             text="What is Python?",
@@ -91,7 +98,7 @@ class TestHttpApiResultPersister:
         assert "timestamp" in request_body["answer"]
 
     @responses.activate
-    def test_release_evaluation_on_failure(self, base_url: str, release_url: str):
+    def test_release_evaluation_on_failure(self, base_url: str, release_url: str, bot_secret: str):
         """Test release evaluation when run_number is 0."""
         responses.post(
             release_url,
@@ -102,7 +109,7 @@ class TestHttpApiResultPersister:
             status=200
         )
 
-        persister = HttpApiResultPersister(base_url)
+        persister = HttpApiResultPersister(base_url, bot_secret=bot_secret)
         prompt = Prompt(
             id="456",
             text="What is Python?",
@@ -124,9 +131,9 @@ class TestHttpApiResultPersister:
         assert request_body["mark_as_failed"] is True
         assert request_body["failure_reason"] == "No citations found after 3 attempts"
 
-    def test_skip_when_missing_evaluation_id(self, base_url: str, caplog):
+    def test_skip_when_missing_evaluation_id(self, base_url: str, bot_secret: str, caplog):
         """Test that save skips API call when evaluation_id is missing."""
-        persister = HttpApiResultPersister(base_url)
+        persister = HttpApiResultPersister(base_url, bot_secret=bot_secret)
         prompt = Prompt(id="1", text="test")  # No evaluation_id
         result = EvaluationResult(
             response_text="answer",
@@ -142,7 +149,7 @@ class TestHttpApiResultPersister:
         assert "Skipping API submission" in caplog.text
 
     @responses.activate
-    def test_submit_retries_on_500_error(self, base_url: str, submit_url: str):
+    def test_submit_retries_on_500_error(self, base_url: str, submit_url: str, bot_secret: str):
         """Test that submit retries on 5xx server errors."""
         # First two attempts: 500 error
         responses.post(submit_url, status=500)
@@ -157,7 +164,8 @@ class TestHttpApiResultPersister:
         persister = HttpApiResultPersister(
             base_url,
             submit_retry_attempts=3,
-            retry_delay_seconds=0.1
+            retry_delay_seconds=0.1,
+            bot_secret=bot_secret
         )
         prompt = Prompt(id="1", text="test", evaluation_id=123)
         result = EvaluationResult(
@@ -172,13 +180,14 @@ class TestHttpApiResultPersister:
         assert len(responses.calls) == 3
 
     @responses.activate
-    def test_submit_does_not_retry_on_400_error(self, base_url: str, submit_url: str):
+    def test_submit_does_not_retry_on_400_error(self, base_url: str, submit_url: str, bot_secret: str):
         """Test that submit does not retry on 4xx client errors."""
         responses.post(submit_url, status=400)
 
         persister = HttpApiResultPersister(
             base_url,
-            submit_retry_attempts=3
+            submit_retry_attempts=3,
+            bot_secret=bot_secret
         )
         prompt = Prompt(id="1", text="test", evaluation_id=123)
         result = EvaluationResult(
@@ -194,7 +203,7 @@ class TestHttpApiResultPersister:
         assert len(responses.calls) == 1
 
     @responses.activate
-    def test_submit_fails_after_max_retries(self, base_url: str, submit_url: str):
+    def test_submit_fails_after_max_retries(self, base_url: str, submit_url: str, bot_secret: str):
         """Test that submit raises error after max retries exhausted."""
         responses.post(submit_url, status=500)
         responses.post(submit_url, status=500)
@@ -203,7 +212,8 @@ class TestHttpApiResultPersister:
         persister = HttpApiResultPersister(
             base_url,
             submit_retry_attempts=3,
-            retry_delay_seconds=0.1
+            retry_delay_seconds=0.1,
+            bot_secret=bot_secret
         )
         prompt = Prompt(id="1", text="test", evaluation_id=123)
         result = EvaluationResult(
@@ -216,13 +226,14 @@ class TestHttpApiResultPersister:
             persister.save(prompt, result, run_number=1)
 
     @responses.activate
-    def test_submit_handles_timeout(self, base_url: str, submit_url: str):
+    def test_submit_handles_timeout(self, base_url: str, submit_url: str, bot_secret: str):
         """Test that submit handles timeout errors."""
         responses.post(submit_url, body=Timeout())
 
         persister = HttpApiResultPersister(
             base_url,
-            submit_retry_attempts=1
+            submit_retry_attempts=1,
+            bot_secret=bot_secret
         )
         prompt = Prompt(id="1", text="test", evaluation_id=123)
         result = EvaluationResult(
@@ -235,11 +246,11 @@ class TestHttpApiResultPersister:
             persister.save(prompt, result, run_number=1)
 
     @responses.activate
-    def test_submit_handles_malformed_json(self, base_url: str, submit_url: str):
+    def test_submit_handles_malformed_json(self, base_url: str, submit_url: str, bot_secret: str):
         """Test that submit handles malformed JSON response."""
         responses.post(submit_url, body="not json", status=200)
 
-        persister = HttpApiResultPersister(base_url)
+        persister = HttpApiResultPersister(base_url, bot_secret=bot_secret)
         prompt = Prompt(id="1", text="test", evaluation_id=123)
         result = EvaluationResult(
             response_text="answer",
@@ -251,7 +262,7 @@ class TestHttpApiResultPersister:
             persister.save(prompt, result, run_number=1)
 
     @responses.activate
-    def test_release_with_default_failure_reason(self, base_url: str, release_url: str):
+    def test_release_with_default_failure_reason(self, base_url: str, release_url: str, bot_secret: str):
         """Test release uses default failure reason if error_message is missing."""
         responses.post(
             release_url,
@@ -259,7 +270,7 @@ class TestHttpApiResultPersister:
             status=200
         )
 
-        persister = HttpApiResultPersister(base_url)
+        persister = HttpApiResultPersister(base_url, bot_secret=bot_secret)
         prompt = Prompt(id="1", text="test", evaluation_id=123)
         result = EvaluationResult(
             response_text="",
@@ -276,11 +287,11 @@ class TestHttpApiResultPersister:
         assert "failed without specific reason" in request_body["failure_reason"]
 
     @responses.activate
-    def test_release_does_not_raise_on_timeout(self, base_url: str, release_url: str, caplog):
+    def test_release_does_not_raise_on_timeout(self, base_url: str, release_url: str, bot_secret: str, caplog):
         """Test that release does not raise error on timeout (best-effort)."""
         responses.post(release_url, body=Timeout())
 
-        persister = HttpApiResultPersister(base_url)
+        persister = HttpApiResultPersister(base_url, bot_secret=bot_secret)
         prompt = Prompt(id="1", text="test", evaluation_id=123)
         result = EvaluationResult(
             response_text="",
@@ -296,13 +307,13 @@ class TestHttpApiResultPersister:
         assert "non-critical" in caplog.text
         assert "evaluation_id=123" in caplog.text
 
-    def test_output_location_property(self, base_url: str):
+    def test_output_location_property(self, base_url: str, bot_secret: str):
         """Test output_location returns base URL."""
-        persister = HttpApiResultPersister(base_url)
+        persister = HttpApiResultPersister(base_url, bot_secret=bot_secret)
         assert persister.output_location == base_url
 
     @responses.activate
-    def test_context_manager(self, base_url: str, submit_url: str):
+    def test_context_manager(self, base_url: str, submit_url: str, bot_secret: str):
         """Test persister works as context manager."""
         responses.post(
             submit_url,
@@ -310,7 +321,7 @@ class TestHttpApiResultPersister:
             status=200
         )
 
-        with HttpApiResultPersister(base_url) as persister:
+        with HttpApiResultPersister(base_url, bot_secret=bot_secret) as persister:
             prompt = Prompt(id="1", text="test", evaluation_id=123)
             result = EvaluationResult(
                 response_text="answer",
@@ -319,9 +330,9 @@ class TestHttpApiResultPersister:
             )
             persister.save(prompt, result, run_number=1)
 
-    def test_close_method(self, base_url: str):
+    def test_close_method(self, base_url: str, bot_secret: str):
         """Test close method releases resources."""
-        persister = HttpApiResultPersister(base_url)
+        persister = HttpApiResultPersister(base_url, bot_secret=bot_secret)
         persister.close()
 
         prompt = Prompt(id="1", text="test", evaluation_id=123)
@@ -335,14 +346,14 @@ class TestHttpApiResultPersister:
         with pytest.raises(PersistenceError, match="closed"):
             persister.save(prompt, result, run_number=1)
 
-    def test_close_idempotent(self, base_url: str):
+    def test_close_idempotent(self, base_url: str, bot_secret: str):
         """Test close can be called multiple times safely."""
-        persister = HttpApiResultPersister(base_url)
+        persister = HttpApiResultPersister(base_url, bot_secret=bot_secret)
         persister.close()
         persister.close()  # Should not raise
 
     @responses.activate
-    def test_multiple_citations_serialized(self, base_url: str, submit_url: str):
+    def test_multiple_citations_serialized(self, base_url: str, submit_url: str, bot_secret: str):
         """Test that multiple citations are properly serialized."""
         responses.post(
             submit_url,
@@ -350,7 +361,7 @@ class TestHttpApiResultPersister:
             status=200
         )
 
-        persister = HttpApiResultPersister(base_url)
+        persister = HttpApiResultPersister(base_url, bot_secret=bot_secret)
         prompt = Prompt(id="1", text="test", evaluation_id=123)
         result = EvaluationResult(
             response_text="answer",
@@ -368,3 +379,68 @@ class TestHttpApiResultPersister:
         assert len(request_body["answer"]["citations"]) == 3
         assert request_body["answer"]["citations"][0]["url"] == "https://example1.com"
         assert request_body["answer"]["citations"][1]["text"] == "Source 2"
+
+    def test_bot_secret_header_is_set(self, base_url: str, bot_secret: str):
+        """Test initialization sets X-Bot-Secret header."""
+        persister = HttpApiResultPersister(
+            api_base_url=base_url,
+            bot_secret=bot_secret
+        )
+        assert persister._session.headers.get('X-Bot-Secret') == bot_secret
+
+    @responses.activate
+    def test_submit_sends_bot_secret_header(self, base_url: str, submit_url: str, bot_secret: str):
+        """Test submit sends X-Bot-Secret header."""
+        def request_callback(request):
+            assert request.headers.get('X-Bot-Secret') == bot_secret
+            return (200, {}, json.dumps({
+                "evaluation_id": 123,
+                "status": "completed"
+            }))
+
+        responses.add_callback(
+            responses.POST,
+            submit_url,
+            callback=request_callback
+        )
+
+        persister = HttpApiResultPersister(
+            api_base_url=base_url,
+            bot_secret=bot_secret
+        )
+        prompt = Prompt(id="1", text="test", evaluation_id=123)
+        result = EvaluationResult(
+            response_text="answer",
+            citations=[],
+            success=True
+        )
+        persister.save(prompt, result, run_number=1)
+
+    @responses.activate
+    def test_release_sends_bot_secret_header(self, base_url: str, release_url: str, bot_secret: str):
+        """Test release sends X-Bot-Secret header."""
+        def request_callback(request):
+            assert request.headers.get('X-Bot-Secret') == bot_secret
+            return (200, {}, json.dumps({
+                "evaluation_id": 123,
+                "action": "marked_failed"
+            }))
+
+        responses.add_callback(
+            responses.POST,
+            release_url,
+            callback=request_callback
+        )
+
+        persister = HttpApiResultPersister(
+            api_base_url=base_url,
+            bot_secret=bot_secret
+        )
+        prompt = Prompt(id="1", text="test", evaluation_id=123)
+        result = EvaluationResult(
+            response_text="",
+            citations=[],
+            success=False,
+            error_message="Test failure"
+        )
+        persister.save(prompt, result, run_number=0)

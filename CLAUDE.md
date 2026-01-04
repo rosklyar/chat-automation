@@ -20,15 +20,14 @@ mkdir sessions
 uv run scripts/create_session.py --output sessions/account1.json
 
 # Run the main application with HTTP API endpoints (local development)
-uv run src/bot.py \
+uv run python -m src.bot \
   --sessions-dir sessions \
   --api-url http://localhost:8000 \
   --results-api-url http://localhost:8000 \
   --assistant-name ChatGPT \
-  --plan-name Plus \
+  --plan-name Free \
   --max-attempts 3 \
-  --poll-retry-seconds 10 \
-  --idle-timeout-minutes 30
+  --bot-secret your-secret-token
 
 # Run tests
 uv run pytest
@@ -64,8 +63,13 @@ ASSISTANT_NAME=ChatGPT
 PLAN_NAME=Plus
 MAX_ATTEMPTS=3
 PER_SESSION_RUNS=10
-POLL_RETRY_SECONDS=10
-IDLE_TIMEOUT_MINUTES=30
+
+# Polling backoff configuration (defaults shown):
+POLL_BASE_INTERVAL=5
+POLL_MAX_INTERVAL=300
+POLL_BACKOFF_MULTIPLIER=2.0
+API_ERROR_RETRY_INTERVAL=300
+BROWSER_CLOSE_THRESHOLD=60
 
 # Then run with docker
 docker run --env-file .env -v ./sessions:/app/sessions:ro chatgpt-automation
@@ -212,8 +216,14 @@ uv run src/bot.py \
 - `--plan-name NAME` (env: `PLAN_NAME`) - Plan name for API requests (default: Plus)
 - `--max-attempts N` (env: `MAX_ATTEMPTS`) - Maximum attempts to get citations per prompt (default: 1)
 - `--per-session-runs N` (env: `PER_SESSION_RUNS`) - Number of attempts per session before switching (default: 10)
-- `--poll-retry-seconds N` (env: `POLL_RETRY_SECONDS`) - Seconds to wait when no prompts available (default: 5.0)
-- `--idle-timeout-minutes N` (env: `IDLE_TIMEOUT_MINUTES`) - Close browser after N minutes of inactivity (default: never)
+- `--bot-secret SECRET` (env: `BOT_SECRET`) - Secret token for API authentication via X-Bot-Secret header (required)
+
+**Polling Backoff Parameters:**
+- `--poll-base-interval N` (env: `POLL_BASE_INTERVAL`) - Base polling interval in seconds (default: 5)
+- `--poll-max-interval N` (env: `POLL_MAX_INTERVAL`) - Maximum polling interval in seconds (default: 300 = 5 min)
+- `--poll-backoff-multiplier N` (env: `POLL_BACKOFF_MULTIPLIER`) - Exponential backoff multiplier (default: 2.0)
+- `--api-error-retry-interval N` (env: `API_ERROR_RETRY_INTERVAL`) - Fixed retry interval when API is unreachable (default: 300 = 5 min)
+- `--browser-close-threshold N` (env: `BROWSER_CLOSE_THRESHOLD`) - Close browser when wait exceeds this (default: 60s)
 
 **Note:** For Docker deployments, use environment variables via `.env` file. For local development, use CLI arguments.
 
@@ -236,18 +246,24 @@ uv run src/bot.py \
   --results-api-url http://localhost:8000 \
   --assistant-name ChatGPT \
   --plan-name Plus \
-  --poll-retry-seconds 10 \
-  --idle-timeout-minutes 30 \
-  --max-attempts 3
+  --max-attempts 3 \
+  --bot-secret your-secret-token
 ```
 
 **How it works:**
 - Polls HTTP API endpoint continuously for new prompts
-- Returns None when no prompts available (non-blocking)
-- Waits `--poll-retry-seconds` before retrying when queue is empty
-- Closes browser after `--idle-timeout-minutes` of inactivity to save resources
+- Uses exponential backoff when queue is empty (starts at `--poll-base-interval`, doubles each retry, caps at `--poll-max-interval`)
+- Closes browser when wait interval exceeds `--browser-close-threshold` to save resources
+- When API is unreachable, enters idle mode with fixed `--api-error-retry-interval` retry
+- Browser automatically relaunches when prompts become available
 - Press Ctrl+C for graceful shutdown
 - Never exhausts - `is_exhausted` always returns False
+
+**Polling Backoff Behavior:**
+- **Normal operation**: Poll every 5s (base interval)
+- **Queue empty**: Exponential backoff: 5s → 10s → 20s → 40s → 80s → ... → 5min cap
+- **Browser closes**: When wait exceeds 60s (configurable)
+- **API unreachable**: Fixed 5min retry interval, browser always closes
 
 **Troubleshooting API Connectivity:**
 - **Connection refused**: Verify API service is running and `--api-url` is correct

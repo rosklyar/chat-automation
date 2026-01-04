@@ -242,15 +242,14 @@ mkdir sessions
 uv run scripts/create_session.py --output sessions/account1.json
 
 # Run automation with HTTP API polling
-uv run src/bot.py \
+uv run python -m src.bot \
   --sessions-dir sessions \
   --api-url http://localhost:8000 \
   --results-api-url http://localhost:8000 \
   --assistant-name ChatGPT \
   --plan-name Free \
   --max-attempts 3 \
-  --poll-retry-seconds 10 \
-  --idle-timeout-minutes 30
+  --bot-secret supersecret
 
 # Run tests
 uv run pytest
