@@ -153,6 +153,11 @@ def create_argument_parser() -> argparse.ArgumentParser:
         type=Path,
         help="Optional log file path for persistent logging"
     )
+    parser.add_argument(
+        "--bot-secret",
+        required=True,
+        help="Secret token for X-Bot-Secret header authentication"
+    )
     return parser
 
 
@@ -421,6 +426,7 @@ def main() -> None:
             api_base_url=args.api_url,
             assistant_name=args.assistant_name,
             plan_name=args.plan_name,
+            bot_secret=args.bot_secret,
             timeout_seconds=args.api_timeout
         )
     except (ValueError, ApiProviderError) as e:
@@ -448,6 +454,7 @@ def main() -> None:
     try:
         result_persister = HttpApiResultPersister(
             api_base_url=args.results_api_url,
+            bot_secret=args.bot_secret,
             submit_retry_attempts=args.submit_retry_attempts,
             timeout_seconds=args.submit_timeout
         )

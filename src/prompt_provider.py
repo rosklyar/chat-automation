@@ -109,6 +109,7 @@ class HttpApiPromptProvider:
         api_base_url: str,
         assistant_name: str,
         plan_name: str,
+        bot_secret: str,
         timeout_seconds: float = 30.0,
         retry_attempts: int = 3,
         retry_delay_seconds: float = 1.0
@@ -123,6 +124,7 @@ class HttpApiPromptProvider:
             timeout_seconds: Request timeout in seconds
             retry_attempts: Max attempts for transient failures
             retry_delay_seconds: Delay between retries
+            bot_secret: Secret token for X-Bot-Secret header authentication
 
         Raises:
             ValueError: If api_base_url is invalid or empty
@@ -148,7 +150,8 @@ class HttpApiPromptProvider:
         self._session = requests.Session()
         self._session.headers.update({
             'Content-Type': 'application/json',
-            'Accept': 'application/json'
+            'Accept': 'application/json',
+            'X-Bot-Secret': bot_secret
         })
 
         self._closed = False

@@ -214,6 +214,7 @@ uv run src/bot.py \
 - `--per-session-runs N` (env: `PER_SESSION_RUNS`) - Number of attempts per session before switching (default: 10)
 - `--poll-retry-seconds N` (env: `POLL_RETRY_SECONDS`) - Seconds to wait when no prompts available (default: 5.0)
 - `--idle-timeout-minutes N` (env: `IDLE_TIMEOUT_MINUTES`) - Close browser after N minutes of inactivity (default: never)
+- `--bot-secret SECRET` (env: `BOT_SECRET`) - Secret token for API authentication via X-Bot-Secret header (required)
 
 **Note:** For Docker deployments, use environment variables via `.env` file. For local development, use CLI arguments.
 

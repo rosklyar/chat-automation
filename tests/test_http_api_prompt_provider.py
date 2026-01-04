@@ -22,45 +22,54 @@ class TestHttpApiPromptProvider:
         """Poll endpoint URL."""
         return f"{base_url}/evaluations/api/v1/poll"
 
-    def test_initialization_success(self, base_url: str):
+    @pytest.fixture
+    def bot_secret(self) -> str:
+        """Bot secret for API authentication."""
+        return "test-secret-123"
+
+    def test_initialization_success(self, base_url: str, bot_secret: str):
         """Test successful initialization with valid parameters."""
         provider = HttpApiPromptProvider(
             api_base_url=base_url,
             assistant_name="ChatGPT",
-            plan_name="Plus"
+            plan_name="Plus",
+            bot_secret=bot_secret
         )
         assert not provider.is_exhausted
         assert provider._poll_endpoint == f"{base_url}/evaluations/api/v1/poll"
 
-    def test_initialization_removes_trailing_slash(self):
+    def test_initialization_removes_trailing_slash(self, bot_secret: str):
         """Test that trailing slash is removed from base URL."""
         provider = HttpApiPromptProvider(
             api_base_url="https://api.example.com/",
             assistant_name="ChatGPT",
-            plan_name="Plus"
+            plan_name="Plus",
+            bot_secret=bot_secret
         )
         assert provider._poll_endpoint == "https://api.example.com/evaluations/api/v1/poll"
 
-    def test_initialization_with_empty_url(self):
+    def test_initialization_with_empty_url(self, bot_secret: str):
         """Test initialization fails with empty URL."""
         with pytest.raises(ValueError, match="cannot be empty"):
             HttpApiPromptProvider(
                 api_base_url="",
                 assistant_name="ChatGPT",
-                plan_name="Plus"
+                plan_name="Plus",
+                bot_secret=bot_secret
             )
 
-    def test_initialization_with_missing_credentials(self, base_url: str):
+    def test_initialization_with_missing_credentials(self, base_url: str, bot_secret: str):
         """Test initialization fails without assistant/plan names."""
         with pytest.raises(ValueError, match="required"):
             HttpApiPromptProvider(
                 api_base_url=base_url,
                 assistant_name="",
-                plan_name="Plus"
+                plan_name="Plus",
+                bot_secret=bot_secret
             )
 
     @responses.activate
-    def test_poll_returns_prompt(self, base_url: str, poll_url: str):
+    def test_poll_returns_prompt(self, base_url: str, poll_url: str, bot_secret: str):
         """Test successful poll returns prompt with metadata."""
         responses.post(
             poll_url,
@@ -77,7 +86,8 @@ class TestHttpApiPromptProvider:
         provider = HttpApiPromptProvider(
             api_base_url=base_url,
             assistant_name="ChatGPT",
-            plan_name="Plus"
+            plan_name="Plus",
+            bot_secret=bot_secret
         )
 
         prompt = provider.poll()
@@ -89,7 +99,7 @@ class TestHttpApiPromptProvider:
         assert prompt.claimed_at == "2025-12-09T10:30:00Z"
 
     @responses.activate
-    def test_poll_returns_none_when_empty(self, base_url: str, poll_url: str):
+    def test_poll_returns_none_when_empty(self, base_url: str, poll_url: str, bot_secret: str):
         """Test poll returns None when API has no prompts."""
         responses.post(
             poll_url,
@@ -106,14 +116,15 @@ class TestHttpApiPromptProvider:
         provider = HttpApiPromptProvider(
             api_base_url=base_url,
             assistant_name="ChatGPT",
-            plan_name="Plus"
+            plan_name="Plus",
+            bot_secret=bot_secret
         )
 
         prompt = provider.poll()
         assert prompt is None
 
     @responses.activate
-    def test_poll_sends_correct_request_body(self, base_url: str, poll_url: str):
+    def test_poll_sends_correct_request_body(self, base_url: str, poll_url: str, bot_secret: str):
         """Test poll sends correct assistant/plan in request."""
         def request_callback(request):
             body = json.loads(request.body)
@@ -136,12 +147,13 @@ class TestHttpApiPromptProvider:
         provider = HttpApiPromptProvider(
             api_base_url=base_url,
             assistant_name="ChatGPT",
-            plan_name="Plus"
+            plan_name="Plus",
+            bot_secret=bot_secret
         )
         provider.poll()
 
     @responses.activate
-    def test_poll_retries_on_500_error(self, base_url: str, poll_url: str):
+    def test_poll_retries_on_500_error(self, base_url: str, poll_url: str, bot_secret: str):
         """Test poll retries on 5xx server errors."""
         # First two attempts: 500 error
         responses.post(poll_url, status=500)
@@ -164,14 +176,15 @@ class TestHttpApiPromptProvider:
             assistant_name="ChatGPT",
             plan_name="Plus",
             retry_attempts=3,
-            retry_delay_seconds=0.1
+            retry_delay_seconds=0.1,
+            bot_secret=bot_secret
         )
 
         prompt = provider.poll()
         assert prompt is None  # Success after retries
 
     @responses.activate
-    def test_poll_fails_after_max_retries(self, base_url: str, poll_url: str):
+    def test_poll_fails_after_max_retries(self, base_url: str, poll_url: str, bot_secret: str):
         """Test poll raises error after max retries exhausted."""
         responses.post(poll_url, status=500)
         responses.post(poll_url, status=500)
@@ -182,14 +195,15 @@ class TestHttpApiPromptProvider:
             assistant_name="ChatGPT",
             plan_name="Plus",
             retry_attempts=3,
-            retry_delay_seconds=0.1
+            retry_delay_seconds=0.1,
+            bot_secret=bot_secret
         )
 
         with pytest.raises(ApiProviderError, match="server error"):
             provider.poll()
 
     @responses.activate
-    def test_poll_does_not_retry_on_400_error(self, base_url: str, poll_url: str):
+    def test_poll_does_not_retry_on_400_error(self, base_url: str, poll_url: str, bot_secret: str):
         """Test poll does not retry on 4xx client errors."""
         responses.post(poll_url, status=400)
 
@@ -197,7 +211,8 @@ class TestHttpApiPromptProvider:
             api_base_url=base_url,
             assistant_name="ChatGPT",
             plan_name="Plus",
-            retry_attempts=3
+            retry_attempts=3,
+            bot_secret=bot_secret
         )
 
         with pytest.raises(ApiProviderError, match="rejected request"):
@@ -207,7 +222,7 @@ class TestHttpApiPromptProvider:
         assert len(responses.calls) == 1
 
     @responses.activate
-    def test_poll_handles_timeout(self, base_url: str, poll_url: str):
+    def test_poll_handles_timeout(self, base_url: str, poll_url: str, bot_secret: str):
         """Test poll handles timeout errors."""
         responses.post(poll_url, body=Timeout())
 
@@ -215,28 +230,30 @@ class TestHttpApiPromptProvider:
             api_base_url=base_url,
             assistant_name="ChatGPT",
             plan_name="Plus",
-            retry_attempts=1
+            retry_attempts=1,
+            bot_secret=bot_secret
         )
 
         with pytest.raises(ApiProviderError, match="timed out"):
             provider.poll()
 
     @responses.activate
-    def test_poll_handles_malformed_json(self, base_url: str, poll_url: str):
+    def test_poll_handles_malformed_json(self, base_url: str, poll_url: str, bot_secret: str):
         """Test poll handles malformed JSON response."""
         responses.post(poll_url, body="not json", status=200)
 
         provider = HttpApiPromptProvider(
             api_base_url=base_url,
             assistant_name="ChatGPT",
-            plan_name="Plus"
+            plan_name="Plus",
+            bot_secret=bot_secret
         )
 
         with pytest.raises(ApiProviderError, match="malformed response"):
             provider.poll()
 
     @responses.activate
-    def test_poll_handles_missing_fields(self, base_url: str, poll_url: str):
+    def test_poll_handles_missing_fields(self, base_url: str, poll_url: str, bot_secret: str):
         """Test poll handles response with missing required fields."""
         responses.post(
             poll_url,
@@ -247,23 +264,25 @@ class TestHttpApiPromptProvider:
         provider = HttpApiPromptProvider(
             api_base_url=base_url,
             assistant_name="ChatGPT",
-            plan_name="Plus"
+            plan_name="Plus",
+            bot_secret=bot_secret
         )
 
         with pytest.raises(ApiProviderError, match="malformed"):
             provider.poll()
 
-    def test_is_exhausted_always_false(self, base_url: str):
+    def test_is_exhausted_always_false(self, base_url: str, bot_secret: str):
         """Test is_exhausted always returns False for API provider."""
         provider = HttpApiPromptProvider(
             api_base_url=base_url,
             assistant_name="ChatGPT",
-            plan_name="Plus"
+            plan_name="Plus",
+            bot_secret=bot_secret
         )
         assert not provider.is_exhausted
 
     @responses.activate
-    def test_context_manager(self, base_url: str, poll_url: str):
+    def test_context_manager(self, base_url: str, poll_url: str, bot_secret: str):
         """Test provider works as context manager."""
         responses.post(
             poll_url,
@@ -280,17 +299,19 @@ class TestHttpApiPromptProvider:
         with HttpApiPromptProvider(
             api_base_url=base_url,
             assistant_name="ChatGPT",
-            plan_name="Plus"
+            plan_name="Plus",
+            bot_secret=bot_secret
         ) as provider:
             prompt = provider.poll()
             assert prompt is None
 
-    def test_close_method(self, base_url: str):
+    def test_close_method(self, base_url: str, bot_secret: str):
         """Test close method releases resources."""
         provider = HttpApiPromptProvider(
             api_base_url=base_url,
             assistant_name="ChatGPT",
-            plan_name="Plus"
+            plan_name="Plus",
+            bot_secret=bot_secret
         )
         provider.close()
 
@@ -298,12 +319,50 @@ class TestHttpApiPromptProvider:
         with pytest.raises(ApiProviderError, match="closed"):
             provider.poll()
 
-    def test_close_idempotent(self, base_url: str):
+    def test_close_idempotent(self, base_url: str, bot_secret: str):
         """Test close can be called multiple times safely."""
         provider = HttpApiPromptProvider(
             api_base_url=base_url,
             assistant_name="ChatGPT",
-            plan_name="Plus"
+            plan_name="Plus",
+            bot_secret=bot_secret
         )
         provider.close()
         provider.close()  # Should not raise
+
+    def test_bot_secret_header_is_set(self, base_url: str, bot_secret: str):
+        """Test initialization sets X-Bot-Secret header."""
+        provider = HttpApiPromptProvider(
+            api_base_url=base_url,
+            assistant_name="ChatGPT",
+            plan_name="Plus",
+            bot_secret=bot_secret
+        )
+        assert provider._session.headers.get('X-Bot-Secret') == bot_secret
+
+    @responses.activate
+    def test_poll_sends_bot_secret_header(self, base_url: str, poll_url: str, bot_secret: str):
+        """Test poll sends X-Bot-Secret header."""
+        def request_callback(request):
+            assert request.headers.get('X-Bot-Secret') == bot_secret
+            return (200, {}, json.dumps({
+                "evaluation_id": None,
+                "prompt_id": None,
+                "prompt_text": None,
+                "topic_id": None,
+                "claimed_at": None
+            }))
+
+        responses.add_callback(
+            responses.POST,
+            poll_url,
+            callback=request_callback
+        )
+
+        provider = HttpApiPromptProvider(
+            api_base_url=base_url,
+            assistant_name="ChatGPT",
+            plan_name="Plus",
+            bot_secret=bot_secret
+        )
+        provider.poll()

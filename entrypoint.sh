@@ -30,6 +30,9 @@ if [ -n "${IDLE_TIMEOUT_MINUTES}" ]; then
   CMD="$CMD --idle-timeout-minutes ${IDLE_TIMEOUT_MINUTES}"
 fi
 
+# Bot secret is required for API authentication
+CMD="$CMD --bot-secret ${BOT_SECRET:?BOT_SECRET environment variable is required}"
+
 # Execute with any additional CLI arguments
 eval $CMD "$@"
 
